@@ -1,0 +1,49 @@
+[project]
+name = "real_estate_pms"
+version = "0.1.0"
+description = "This project is aimed to automate real estate Projectroject Management, reduce errors and replace manual data entry"
+license = {text = "Apache License 2.0."}                
+authors = [
+    {name = "Areeba Hassan", email = "iamneeba@gmail.com"},
+]
+
+requires-python = "==3.13.*"
+dependencies = [
+    # Core Web Framework (Latest stable as of April 2026)
+    "Django==6.0.4",
+
+    # PostgreSQL Driver
+    "psycopg2-binary==2.9.11",
+
+    # Production WSGI Server
+    "gunicorn==25.3.0",
+
+    # HTMX integration for modern frontend without heavy JS
+    "django-htmx==1.27.0",
+
+    # HTML to PDF generation
+    "WeasyPrint==68.1",
+
+    # Secure secrets management (.env file)
+    "python-decouple==3.8",
+
+    # Image processing (used with ImageField)
+    "Pillow==12.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "django-debug-toolbar==6.3.0",
+    "ruff==0.15.11",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "W"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
