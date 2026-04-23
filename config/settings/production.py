@@ -3,6 +3,8 @@ from .base import *
 DEBUG = False
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 
+SECRET_KEY = config('SECRET_KEY')
+
 # Security settings (very important)
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
