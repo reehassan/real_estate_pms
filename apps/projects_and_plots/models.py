@@ -66,7 +66,7 @@ class Project(models.Model):
         self.save()
 
 
-# PLOT 
+# PLOT
 class Plot(models.Model):
 
     class SizeUnit(models.TextChoices):
@@ -80,6 +80,7 @@ class Plot(models.Model):
 
     class Status(models.TextChoices):
         AVAILABLE = 'AVAILABLE', 'Available'
+        TOKEN     = 'TOKEN'    , 'Token'
         BOOKED    = 'BOOKED',    'Booked'
         SOLD      = 'SOLD',      'Sold'
 
