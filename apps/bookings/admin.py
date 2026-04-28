@@ -22,7 +22,7 @@ class BookingAdmin(admin.ModelAdmin):
     inlines         = [InstallmentInline]
 
     def get_queryset(self, request):
-        return Booking.all_objects.all()
+        return Booking.all_objects.select_related('customer', 'plot')
 
 
 @admin.register(Installment)

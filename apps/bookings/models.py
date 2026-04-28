@@ -96,23 +96,30 @@ class Booking(models.Model):
     objects         = SoftDeleteManager()
     all_objects     = models.Manager()
 
-    class Meta:
-        verbose_name        = 'Booking'
-        verbose_name_plural = 'Bookings'
-        ordering            = ['-created_at']
-        indexes             = [
-            models.Index(fields=['status'],      name='idx_booking_status'),
-            models.Index(fields=['customer'],    name='idx_booking_customer'),
-            models.Index(fields=['plot'],        name='idx_booking_plot'),
-        ]
-
     def __str__(self):
-        return f'Booking #{self.pk} — Plot {self.plot_id}'
+        return f'{self.customer.full_name} — Plot {self.plot.plot_number}'
 
     def delete(self, *args, **kwargs):
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save()
+    
+    class Meta:
+        verbose_name        = 'Booking'
+        verbose_name_plural = 'Bookings'
+        ordering            = ['-created_at']
+        constraints         = [
+            models.UniqueConstraint(
+                fields=['plot'],
+                condition=models.Q(status='active'),
+                name='unique_active_booking_per_plot'
+            )
+        ]
+        indexes = [
+            models.Index(fields=['status'],   name='idx_booking_status'),
+            models.Index(fields=['customer'], name='idx_booking_customer'),
+            models.Index(fields=['plot'],     name='idx_booking_plot'),
+        ]
 
 
 class Installment(models.Model):
