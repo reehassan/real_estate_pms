@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'apps.accounts.apps.AccountsConfig',
     'apps.projects_and_plots.apps.ProjectsAndPlotsConfig',
     'apps.customers.apps.CustomersConfig',
+    'apps.bookings.apps.BookingsConfig',
 ]
 
 AUTH_USER_MODEL = "accounts.User"
