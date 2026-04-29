@@ -12,7 +12,6 @@ from .models import Booking, Installment
 
 
 def generate_installments(booking: Booking) -> None:
-
     PLAN_COUNTS = {
         Booking.PaymentPlan.LUMP_SUM:   1,
         Booking.PaymentPlan.THREE_YEAR: 36,
@@ -20,7 +19,12 @@ def generate_installments(booking: Booking) -> None:
     }
 
     count        = PLAN_COUNTS[booking.payment_plan]
-    installable  = booking.total_price - booking.down_payment
+
+    # Coerce to Decimal to avoid float/Decimal arithmetic issues when callers
+    # assign money fields using Python floats (e.g. 120000.00).
+    total_price  = Decimal(str(booking.total_price))
+    down_payment = Decimal(str(booking.down_payment))
+    installable  = total_price - down_payment
     amount_per   = (installable / Decimal(count)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     last_amount  = installable - (amount_per * (count - 1))
     project_code = booking.plot.project.name[:3].upper()
