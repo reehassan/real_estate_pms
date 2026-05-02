@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'apps.projects_and_plots.apps.ProjectsAndPlotsConfig',
     'apps.customers.apps.CustomersConfig',
     'apps.bookings.apps.BookingsConfig',
+    'apps.expenses.apps.ExpensesConfig',
+    'apps.dashboard.apps.DashboardConfig',
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -62,13 +64,21 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],  # Global templates directory
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+
+                "django.template.context_processors.debug",
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
+                "django.template.context_processors.request",
                 'django.contrib.messages.context_processors.messages',
+                'apps.expenses.context_processors.pending_expenses_count',  # Royal Land custom
+
+                # Royal Land custom:
+                "apps.expenses.context_processors.pending_expenses_count",
+
             ],
         },
     },
@@ -77,6 +87,21 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
+
+# ── Auth redirects ──────────────────────────────────────────────
+LOGIN_URL          = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"          # after successful login → dashboard
+LOGOUT_REDIRECT_URL = "/accounts/login/"
+
+# ── Message tags (map Django levels to CSS class suffixes) ──────
+from django.contrib.messages import constants as messages
+MESSAGE_TAGS = {
+    messages.DEBUG:   "info",
+    messages.INFO:    "info",
+    messages.SUCCESS: "success",
+    messages.WARNING: "warning",
+    messages.ERROR:   "error",
+}
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
