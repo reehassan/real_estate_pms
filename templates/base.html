@@ -1,0 +1,187 @@
+{# FILE: templates/base.html #}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Royal Land PMS{% endblock %}</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+  <style>
+  :root {
+    --plum:         #1C0F3F;
+    --gold:         #C4923A;
+    --gold-pale:    rgba(196,146,58,0.12);
+    --bg:           #FAF7F2;
+    --surface:      #FFF8F3;
+    --card:         #FFFFFF;
+    --surface-low:  #FDF2E7;
+    --text:         #1F1B14;
+    --text-sub:     #4F4537;
+    --text-mute:    #817565;
+    --border:       #E8E3DB;
+    --error:        #BA1A1A;
+    --error-bg:     #FFDAD6;
+    --success:      #2D6A4F;
+    --success-bg:   #E8F5E9;
+    --warn:         #C4923A;
+    --warn-bg:      #FFF3CD;
+    --r-card:       10px;
+    --r-ui:         6px;
+    --sidebar-w:    240px;
+    --topbar-h:     64px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{font-size:14px;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden;}
+  a{text-decoration:none;color:inherit;}
+  button{cursor:pointer;border:none;background:none;font-family:inherit;}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--text);outline:none;}
+  .material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;font-size:20px;display:inline-block;vertical-align:middle;line-height:1;}
+
+  /* Shell */
+  .shell{display:flex;min-height:100vh;}
+
+  /* Sidebar */
+  .sidebar{width:var(--sidebar-w);background:var(--plum);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;overflow-y:auto;transition:transform 0.3s;}
+  .sidebar-logo{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.06);}
+  .sidebar-logo-name{font-size:18px;font-weight:700;letter-spacing:0.04em;color:#fff;}
+  .sidebar-logo-tag{font-size:11px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-top:3px;}
+  .sidebar-section-label{padding:20px 24px 6px;font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.25);}
+  .sidebar-nav{flex:1;padding-bottom:16px;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:10px 24px;color:rgba(255,255,255,0.5);font-size:13.5px;font-weight:400;letter-spacing:0.01em;transition:all 0.15s;border-left:3px solid transparent;cursor:pointer;}
+  .nav-item:hover{color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.05);}
+  .nav-item.active{color:var(--gold);background:rgba(196,146,58,0.10);border-left-color:var(--gold);font-weight:500;}
+  .nav-item .material-symbols-outlined{font-size:19px;}
+  .nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;background:var(--error);border-radius:99px;font-size:10px;font-weight:700;color:#fff;margin-left:auto;}
+  .sidebar-bottom{border-top:1px solid rgba(255,255,255,0.06);padding:12px 0;}
+  .sidebar-user{display:flex;align-items:center;gap:10px;padding:12px 20px;}
+  .sidebar-user-avatar{width:32px;height:32px;border-radius:50%;background:var(--gold-pale);border:1px solid rgba(196,146,58,0.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--gold);letter-spacing:0.05em;flex-shrink:0;}
+  .sidebar-user-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .sidebar-user-role{font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:0.08em;text-transform:uppercase;}
+
+  /* Main */
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{height:var(--topbar-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 40px;position:sticky;top:0;z-index:50;gap:24px;}
+  .canvas{padding:32px 40px;flex:1;}
+  .topbar-search{position:relative;flex:1;max-width:380px;}
+  .topbar-search input{width:100%;height:36px;padding:0 14px 0 38px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-ui);font-size:13px;}
+  .topbar-search input::placeholder{color:var(--text-mute);}
+  .topbar-search .material-symbols-outlined{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:17px;color:var(--text-mute);}
+  .topbar-actions{display:flex;align-items:center;gap:20px;}
+  .topbar-icon-btn{color:var(--text-mute);padding:4px;display:flex;align-items:center;transition:color 0.15s;}
+  .topbar-icon-btn:hover{color:var(--gold);}
+  .topbar-divider{width:1px;height:24px;background:var(--border);}
+  .topbar-user{display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .topbar-user-initials{width:30px;height:30px;border-radius:50%;background:var(--plum);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;}
+  .topbar-user-name{font-size:12.5px;font-weight:500;}
+  .topbar-user-role{font-size:10px;color:var(--text-mute);}
+  .hamburger-btn{display:none;color:var(--text-mute);padding:4px;}
+
+  /* Flash messages */
+  .flash-container{padding:16px 40px 0;}
+  .flash{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r-ui);font-size:13px;font-weight:500;margin-bottom:8px;border:1px solid transparent;}
+  .flash-success{background:var(--success-bg);color:var(--success);border-color:rgba(45,106,79,0.2);}
+  .flash-error,.flash-danger{background:var(--error-bg);color:var(--error);border-color:rgba(186,26,26,0.2);}
+  .flash-warning{background:var(--warn-bg);color:var(--warn);border-color:rgba(196,146,58,0.2);}
+  .flash-info{background:var(--surface-low);color:var(--text-sub);border-color:var(--border);}
+  .flash-close{margin-left:auto;cursor:pointer;color:inherit;opacity:0.6;display:flex;align-items:center;}
+  .flash-close:hover{opacity:1;}
+
+  /* Mobile overlay */
+  .mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:99;}
+  @media(max-width:768px){
+    .hamburger-btn{display:flex;}
+    .sidebar{transform:translateX(-100%);}
+    .sidebar.open{transform:translateX(0);}
+    .mobile-overlay.active{display:block;}
+    .main{margin-left:0;}
+    .topbar{padding:0 16px;}
+    .flash-container{padding:12px 16px 0;}
+    .canvas{padding:20px 16px;}
+  }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div class="shell">
+
+  {# ── Sidebar ── #}
+  {% include "partials/sidebar.html" %}
+
+  {# ── Main ── #}
+  <div class="main">
+
+    <header class="topbar">
+      <button class="hamburger-btn topbar-icon-btn" onclick="toggleSidebar()" aria-label="Open menu">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+
+      <div class="topbar-search">
+        <span class="material-symbols-outlined">search</span>
+        <input type="search" placeholder="Search projects, customers…">
+      </div>
+
+      <div class="topbar-actions">
+        <button class="topbar-icon-btn" title="Notifications">
+          <span class="material-symbols-outlined">notifications</span>
+        </button>
+        <div class="topbar-divider"></div>
+        <div class="topbar-user">
+          <div class="topbar-user-initials">
+            {{ request.user.get_short_name|first|upper|default:request.user.username|first|upper }}
+          </div>
+          <div>
+            <div class="topbar-user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+            <div class="topbar-user-role">{{ request.user.is_staff|yesno:"Administrator,Staff" }}</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {# ── Flash Messages ── #}
+    {% if messages %}
+    <div class="flash-container">
+      {% for message in messages %}
+      <div class="flash flash-{{ message.tags }}">
+        <span class="material-symbols-outlined" style="font-size:16px;">
+          {% if 'success' in message.tags %}check_circle
+          {% elif 'error' in message.tags or 'danger' in message.tags %}error
+          {% elif 'warning' in message.tags %}warning
+          {% else %}info{% endif %}
+        </span>
+        {{ message }}
+        <button class="flash-close" onclick="this.parentElement.remove()" aria-label="Dismiss">
+          <span class="material-symbols-outlined" style="font-size:16px;">close</span>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── Page Content ── #}
+    <main class="canvas">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>{# /main #}
+</div>{# /shell #}
+
+<script>
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('mobile-overlay').classList.toggle('active');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mobile-overlay').classList.remove('active');
+}
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

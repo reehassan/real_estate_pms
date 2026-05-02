@@ -1,0 +1,117 @@
+{# FILE: templates/registration/login.html #}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sign In — Royal Land PMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <style>
+  :root{--plum:#1C0F3F;--gold:#C4923A;--surface:#FFF8F3;--card:#FFFFFF;--text:#1F1B14;--text-mute:#817565;--border:#E8E3DB;--error:#BA1A1A;--error-bg:#FFDAD6;--r-ui:6px;}
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{font-size:14px;}
+  body{font-family:'Inter',sans-serif;color:var(--text);line-height:1.6;min-height:100vh;display:flex;}
+  .material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;font-size:20px;display:inline-block;vertical-align:middle;line-height:1;}
+  .login-shell{display:flex;min-height:100vh;width:100%;}
+  .brand-panel{width:45%;background:var(--plum);display:flex;flex-direction:column;justify-content:space-between;padding:56px 52px;position:relative;overflow:hidden;flex-shrink:0;}
+  .brand-panel::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 20% 80%,rgba(196,146,58,0.15) 0%,transparent 60%),radial-gradient(ellipse at 80% 10%,rgba(196,146,58,0.08) 0%,transparent 50%);pointer-events:none;}
+  .brand-logo-name{font-size:22px;font-weight:700;letter-spacing:0.06em;color:#fff;position:relative;z-index:1;}
+  .brand-logo-sep{width:32px;height:1px;background:var(--gold);margin:10px 0;position:relative;z-index:1;}
+  .brand-logo-tag{font-size:10px;font-weight:500;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.35);position:relative;z-index:1;}
+  .brand-body{position:relative;z-index:1;}
+  .brand-headline{font-size:30px;font-weight:500;color:#fff;line-height:1.3;margin-bottom:14px;}
+  .brand-headline em{font-style:normal;color:var(--gold);}
+  .brand-sub{font-size:13px;color:rgba(255,255,255,0.45);line-height:1.7;max-width:300px;}
+  .brand-stats{display:flex;gap:32px;position:relative;z-index:1;}
+  .brand-stat-num{font-size:24px;font-weight:600;color:var(--gold);letter-spacing:-0.02em;}
+  .brand-stat-lbl{font-size:10px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-top:2px;}
+  .login-panel{flex:1;background:var(--surface);display:flex;align-items:center;justify-content:center;padding:48px 40px;}
+  .login-box{width:100%;max-width:400px;}
+  .login-eyebrow{font-size:10px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-mute);margin-bottom:8px;}
+  .login-title{font-size:26px;font-weight:500;letter-spacing:-0.01em;color:var(--text);margin-bottom:6px;}
+  .login-sub{font-size:13px;color:var(--text-mute);margin-bottom:36px;}
+  .field-group{margin-bottom:18px;}
+  .field-label{display:block;font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-mute);margin-bottom:7px;}
+  .field-input{width:100%;height:48px;padding:0 14px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-ui);font-size:14px;color:var(--text);transition:border-color 0.15s;outline:none;font-family:inherit;}
+  .field-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(196,146,58,0.12);}
+  .field-input.has-error{border-color:var(--error);}
+  .field-errors{margin-top:5px;}
+  .field-error-item{font-size:11.5px;color:var(--error);display:flex;align-items:center;gap:4px;}
+  .form-error-banner{background:var(--error-bg);border:1px solid rgba(186,26,26,0.2);border-radius:var(--r-ui);padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--error);display:flex;align-items:flex-start;gap:8px;}
+  .login-btn{width:100%;height:48px;background:var(--plum);color:#fff;border-radius:var(--r-ui);font-size:14px;font-weight:500;letter-spacing:0.02em;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.15s;margin-top:8px;font-family:inherit;}
+  .login-btn:hover{background:#2a1860;}
+  @media(max-width:768px){.brand-panel{display:none;}.login-panel{padding:40px 24px;}}
+  </style>
+</head>
+<body>
+<div class="login-shell">
+  <div class="brand-panel">
+    <div>
+      <div class="brand-logo-name">Royal Land</div>
+      <div class="brand-logo-sep"></div>
+      <div class="brand-logo-tag">Property Management System</div>
+    </div>
+    <div class="brand-body">
+      <div class="brand-headline">Manage every <em>plot,</em><br>booking &amp; payment<br>in one place.</div>
+      <div class="brand-sub">A fully integrated platform built for real estate professionals who demand clarity and control.</div>
+    </div>
+    <div class="brand-stats">
+      <div><div class="brand-stat-num">60+</div><div class="brand-stat-lbl">Active Plots</div></div>
+      <div><div class="brand-stat-num">₨ 2Cr+</div><div class="brand-stat-lbl">Under Management</div></div>
+    </div>
+  </div>
+
+  <div class="login-panel">
+    <div class="login-box">
+      <div class="login-eyebrow">Staff Portal</div>
+      <div class="login-title">Welcome back</div>
+      <div class="login-sub">Sign in to your Royal Land account</div>
+
+      {% if form.non_field_errors %}
+      <div class="form-error-banner">
+        <span class="material-symbols-outlined" style="font-size:16px;flex-shrink:0;margin-top:1px;">error</span>
+        <div>{% for error in form.non_field_errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
+      </div>
+      {% endif %}
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="field-group">
+          <label class="field-label" for="{{ form.username.id_for_label }}">Username</label>
+          <input class="field-input {% if form.username.errors %}has-error{% endif %}"
+                 type="text" name="{{ form.username.html_name }}" id="{{ form.username.id_for_label }}"
+                 value="{{ form.username.value|default:'' }}" autocomplete="username" autofocus
+                 placeholder="Enter your username">
+          {% if form.username.errors %}
+          <div class="field-errors">{% for e in form.username.errors %}
+            <div class="field-error-item"><span class="material-symbols-outlined" style="font-size:13px;">error</span>{{ e }}</div>
+          {% endfor %}</div>
+          {% endif %}
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="{{ form.password.id_for_label }}">Password</label>
+          <input class="field-input {% if form.password.errors %}has-error{% endif %}"
+                 type="password" name="{{ form.password.html_name }}" id="{{ form.password.id_for_label }}"
+                 autocomplete="current-password" placeholder="Enter your password">
+          {% if form.password.errors %}
+          <div class="field-errors">{% for e in form.password.errors %}
+            <div class="field-error-item"><span class="material-symbols-outlined" style="font-size:13px;">error</span>{{ e }}</div>
+          {% endfor %}</div>
+          {% endif %}
+        </div>
+
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+        <button type="submit" class="login-btn">
+          <span class="material-symbols-outlined" style="font-size:17px;">login</span>
+          Sign In
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+</body>
+</html>

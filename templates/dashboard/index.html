@@ -1,0 +1,36 @@
+{# FILE: templates/dashboard/index.html #}
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Royal Land PMS{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:8px;">
+  <div style="font-size:11px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-mute);">Overview</div>
+</div>
+<h1 style="font-size:26px;font-weight:500;letter-spacing:-0.01em;color:var(--text);line-height:1.2;margin-bottom:32px;">
+  Dashboard
+</h1>
+
+{# Stat cards placeholder — replace with real querysets #}
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;">
+  {% for label, value, sub in dashboard_stats|default:"" %}
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-mute);margin-bottom:8px;">{{ label }}</div>
+    <div style="font-size:26px;font-weight:500;letter-spacing:-0.02em;">{{ value }}</div>
+    <div style="font-size:11px;color:var(--text-mute);margin-top:8px;">{{ sub }}</div>
+  </div>
+  {% empty %}
+  {# Skeleton cards until you wire real data #}
+  {% for i in "1234" %}
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;min-height:110px;">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-mute);margin-bottom:8px;">Metric</div>
+    <div style="font-size:26px;font-weight:500;color:var(--text);">—</div>
+  </div>
+  {% endfor %}
+  {% endfor %}
+</div>
+
+<p style="color:var(--text-mute);font-size:13px;">
+  Dashboard content goes here. Use <code>{% verbatim %}{% block content %}{% endblock %}{% endverbatim %}</code> in child templates.
+</p>
+{% endblock %}

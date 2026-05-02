@@ -1,0 +1,75 @@
+{# FILE: templates/partials/sidebar.html #}
+{% load static %}
+
+<aside class="sidebar" id="sidebar">
+
+  {# ── Logo ── #}
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-name">Royal Land</div>
+    <div class="sidebar-logo-tag">Property Management</div>
+  </div>
+
+  {# ── Navigation ── #}
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Main Menu</div>
+
+    <a href="{% url 'dashboard:index' %}"
+       class="nav-item {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}">
+      <span class="material-symbols-outlined">dashboard</span>
+      Dashboard
+    </a>
+
+    <a href="{% url 'projects_and_plots:list' %}"
+       class="nav-item {% if request.resolver_match.app_name == 'projects_and_plots' %}active{% endif %}">
+      <span class="material-symbols-outlined">domain</span>
+      Projects
+    </a>
+
+    <a href="{% url 'customers:list' %}"
+       class="nav-item {% if request.resolver_match.app_name == 'customers' %}active{% endif %}">
+      <span class="material-symbols-outlined">group</span>
+      Customers
+    </a>
+
+    <a href="{% url 'bookings:list' %}"
+       class="nav-item {% if request.resolver_match.app_name == 'bookings' %}active{% endif %}">
+      <span class="material-symbols-outlined">receipt_long</span>
+      Bookings
+    </a>
+
+    <a href="{% url 'expenses:list' %}"
+       class="nav-item {% if request.resolver_match.app_name == 'expenses' %}active{% endif %}">
+      <span class="material-symbols-outlined">account_balance_wallet</span>
+      Expenses
+      {% if pending_expenses_count %}
+        <span class="nav-badge">{{ pending_expenses_count }}</span>
+      {% endif %}
+    </a>
+
+  </nav>
+
+  {# ── Bottom: User block + Logout ── #}
+  <div class="sidebar-bottom">
+    <div class="sidebar-user">
+      <div class="sidebar-user-avatar">
+        {{ request.user.get_short_name|first|upper|default:request.user.username|first|upper }}
+      </div>
+      <div>
+        <div class="sidebar-user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+        <div class="sidebar-user-role">{{ request.user.is_staff|yesno:"Admin,Staff" }}</div>
+      </div>
+      
+    </div>
+    <form method="post" action="{% url 'accounts:logout' %}" style="margin-top:4px;">
+  {% csrf_token %}
+        <button type="submit" class="nav-item" style="background:none;border:none;width:100%;text-align:left;">
+          <span class="material-symbols-outlined">logout</span>
+          Sign Out
+        </button>
+    </form>
+  </div>
+
+</aside>
+
+{# Mobile overlay — tap to close #}
+<div class="mobile-overlay" id="mobile-overlay" onclick="closeSidebar()"></div>
