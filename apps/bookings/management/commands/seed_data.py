@@ -1,162 +1,197 @@
 """
-apps/bookings/management/commands/seed_data.py
-
-Seed script for development and testing.
-Creates: 1 project, 10 plots, 3 customers, 2 bookings with installments.
-Expenses skipped — model not built yet.
-
-Usage:
-    python manage.py seed_data
-    python manage.py seed_data --flush   # wipe existing seed data first
+Management command to seed the database with realistic test data.
+Run: python manage.py seed_data
 """
 
+import random
+from datetime import date, timedelta
 from django.core.management.base import BaseCommand
-from django.db import transaction
-
-from datetime import date 
+from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 from apps.projects_and_plots.models import Project, Plot
 from apps.customers.models import Customer
-from apps.bookings.models import Booking
+from apps.bookings.models import Booking, Installment
+# from apps.expenses.models import Expense
 
+User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = 'Seed database with development data'
+    help = 'Seed the database with test data for development'
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--flush',
-            action='store_true',
-            help='Delete existing seed data before seeding',
+            '--projects',
+            type=int,
+            default=3,
+            help='Number of projects to create (default: 3)'
+        )
+        parser.add_argument(
+            '--plots-per-project',
+            type=int,
+            default=20,
+            help='Number of plots per project (default: 20)'
+        )
+        parser.add_argument(
+            '--customers',
+            type=int,
+            default=50,
+            help='Number of customers to create (default: 50)'
+        )
+        parser.add_argument(
+            '--bookings',
+            type=int,
+            default=30,
+            help='Number of bookings to create (default: 30)'
         )
 
     def handle(self, *args, **options):
-        if options['flush']:
-            self.stdout.write('Flushing existing data...')
-            Booking.all_objects.all().delete()
-            Customer.all_objects.all().delete()
-            Plot.all_objects.all().delete()
-            Project.all_objects.all().delete()
-            self.stdout.write(self.style.WARNING('Existing data deleted.'))
+        self.stdout.write("Seeding database...")
 
-        with transaction.atomic():
-            self._create_project_and_plots()
-            self._create_customers()
-            self._create_bookings()
-
-        self.stdout.write(self.style.SUCCESS('Seed data created successfully.'))
-
-    # ─────────────────────────────────────────────
-    # PRIVATE METHODS
-    # ─────────────────────────────────────────────
-
-    def _create_project_and_plots(self):
-        self.stdout.write('Creating project...')
-
-        self.project = Project.objects.create(
-            name        = 'Dreamland Phase 1',
-            location    = 'Bahria Town Road, Rawalpindi',
-            total_area  = 500,
-            area_unit   = Project.AreaUnit.MARLA,
-            description = 'First phase of Dreamland housing scheme.',
-            status      = Project.Status.ACTIVE,
-        )
-
-        self.stdout.write('Creating 10 plots...')
-
-        plots_data = [
-            ('A-01', 'Block A', 5,  Plot.SizeUnit.MARLA, Plot.Category.RESIDENTIAL,  2500000,  Plot.Status.AVAILABLE),
-            ('A-02', 'Block A', 5,  Plot.SizeUnit.MARLA, Plot.Category.RESIDENTIAL,  2500000,  Plot.Status.AVAILABLE),
-            ('A-03', 'Block A', 10, Plot.SizeUnit.MARLA, Plot.Category.RESIDENTIAL,  4800000,  Plot.Status.AVAILABLE),
-            ('A-04', 'Block A', 10, Plot.SizeUnit.MARLA, Plot.Category.RESIDENTIAL,  4800000,  Plot.Status.AVAILABLE),
-            ('B-01', 'Block B', 5,  Plot.SizeUnit.MARLA, Plot.Category.RESIDENTIAL,  2700000,  Plot.Status.AVAILABLE),
-            ('B-02', 'Block B', 5,  Plot.SizeUnit.MARLA, Plot.Category.RESIDENTIAL,  2700000,  Plot.Status.AVAILABLE),
-            ('B-03', 'Block B', 1,  Plot.SizeUnit.KANAL, Plot.Category.RESIDENTIAL,  9500000,  Plot.Status.AVAILABLE),
-            ('B-04', 'Block B', 1,  Plot.SizeUnit.KANAL, Plot.Category.RESIDENTIAL,  9500000,  Plot.Status.AVAILABLE),
-            ('C-01', 'Block C', 4,  Plot.SizeUnit.MARLA, Plot.Category.COMMERCIAL,   6000000,  Plot.Status.AVAILABLE),
-            ('C-02', 'Block C', 4,  Plot.SizeUnit.MARLA, Plot.Category.COMMERCIAL,   6000000,  Plot.Status.AVAILABLE),
-        ]
-
-        self.plots = []
-        for plot_number, block, size, size_unit, category, price, status in plots_data:
-            plot = Plot.objects.create(
-                project     = self.project,
-                plot_number = plot_number,
-                block       = block,
-                size        = size,
-                size_unit   = size_unit,
-                category    = category,
-                price       = price,
-                status      = status,
-            )
-            self.plots.append(plot)
-
-        self.stdout.write(f'  Created project: {self.project.name}')
-        self.stdout.write(f'  Created {len(self.plots)} plots')
-
-    def _create_customers(self):
-        self.stdout.write('Creating 3 customers...')
-
-        customers_data = [
-            ('Muhammad Ali Khan',   '35201-1234567-1', '03001234567', 'House 12, Street 4, G-9, Islamabad',    Customer.CustomerType.INDIVIDUAL),
-            ('Fatima Sheikh',       '35202-7654321-2', '03217654321', 'Flat 3B, Blue Towers, F-10, Islamabad', Customer.CustomerType.INDIVIDUAL),
-            ('Pak Builders Ltd',    '35203-1122334-3', '03451122334', 'Office 5, Business Square, I-8, Islamabad', Customer.CustomerType.CORPORATE),
-        ]
-
-        self.customers = []
-        for full_name, cnic, phone, address, customer_type in customers_data:
-            customer = Customer.objects.create(
-                full_name     = full_name,
-                cnic          = cnic,
-                phone         = phone,
-                address       = address,
-                customer_type = customer_type,
-            )
-            self.customers.append(customer)
-            self.stdout.write(f'  Created customer: {customer.full_name}')
-
-    def _create_bookings(self):
-        self.stdout.write('Creating 2 bookings...')
-
-        from apps.accounts.models import User
+        # Get or create admin user for 'booked_by'
         admin_user = User.objects.filter(is_superuser=True).first()
-
         if not admin_user:
-            self.stdout.write(self.style.ERROR(
-                'No superuser found. Run: python manage.py createsuperuser first.'
-            ))
-            return
+            admin_user = User.objects.create_superuser(
+                username='admin',
+                email='admin@example.com',
+                password='admin123'
+            )
+            self.stdout.write("Created superuser 'admin' with password 'admin123'")
 
-        # Booking 1 — 3 year plan
-        booking1 = Booking.objects.create(
-            customer     = self.customers[0],
-            plot         = self.plots[0],
-            booked_by    = admin_user,
-            booking_date = date(2026, 4, 1),
-            total_price  = self.plots[0].price,
-            down_payment = 500000,
-            payment_plan = Booking.PaymentPlan.THREE_YEAR,
-            status       = Booking.Status.ACTIVE,
-            notes        = 'Seed booking — 3 year plan.',
-        )
-        self.plots[0].status = Plot.Status.BOOKED
-        self.plots[0].save()
+        # 1. Create Projects
+        projects = []
+        project_codes = ['GHQ', 'GBS', 'PHA', 'DHA', 'BHC']
+        project_names = [
+            "Royal Land", "Green Bay Society", "Park View Housing",
+            "Defence Housing", "Blue Heights City"
+        ]
+        locations = [
+            "Lahore", "Karachi", "Islamabad", "Rawalpindi", "Multan"
+        ]
 
-        # Booking 2 — 5 year plan
-        booking2 = Booking.objects.create(
-            customer     = self.customers[1],
-            plot         = self.plots[2],
-            booked_by    = admin_user,
-            booking_date = date(2026, 4, 15),
-            total_price  = self.plots[2].price,
-            down_payment = 800000,
-            payment_plan = Booking.PaymentPlan.FIVE_YEAR,
-            status       = Booking.Status.ACTIVE,
-            notes        = 'Seed booking — 5 year plan.',
-        )
-        self.plots[2].status = Plot.Status.BOOKED
-        self.plots[2].save()
+        for i in range(options['projects']):
+            code = project_codes[i] if i < len(project_codes) else f"PROJ{i+1:03d}"
+            proj = Project.objects.create(
+                name=project_names[i % len(project_names)],
+                code=code,
+                location=locations[i % len(locations)],
+                total_plots=options['plots_per_project'],
+                total_area=random.randint(500, 5000),
+                status=random.choice(['ACTIVE', 'ACTIVE', 'ACTIVE', 'COMPLETED']),
+                description=f"Test project {i+1} with {options['plots_per_project']} plots."
+            )
+            projects.append(proj)
+        self.stdout.write(f"Created {len(projects)} projects")
 
-        self.stdout.write(f'  Booking 1: {booking1} — {booking1.installments.count()} installments')
-        self.stdout.write(f'  Booking 2: {booking2} — {booking2.installments.count()} installments')
+        # 2. Create Plots for each project
+        plot_statuses = ['AVAILABLE', 'AVAILABLE', 'BOOKED', 'SOLD']
+        categories = ['RESIDENTIAL', 'COMMERCIAL']
+        all_plots = []
+
+        for proj in projects:
+            for plot_num in range(1, options['plots_per_project'] + 1):
+                status = random.choices(plot_statuses, weights=[0.5, 0.3, 0.15, 0.05])[0]
+                plot = Plot.objects.create(
+                    project=proj,
+                    plot_number=f"{plot_num:03d}",
+                    block=chr(65 + (plot_num % 26)),  # A, B, C...
+                    size=random.choice([3, 5, 7, 10, 12.5]),
+                    size_unit='MARLA',
+                    category=random.choice(categories),
+                    price=random.randint(500000, 5000000),
+                    status=status,
+                    notes=f"Test plot {plot_num}"
+                )
+                all_plots.append(plot)
+        self.stdout.write(f"Created {len(all_plots)} plots")
+
+        # 3. Create Customers
+        customers = []
+        first_names = ["Ali", "Sara", "Ahmed", "Fatima", "Bilal", "Zara", "Omar", "Hina", "Usman", "Ayesha"]
+        last_names = ["Khan", "Malik", "Raza", "Chaudhry", "Tariq", "Hassan", "Butt", "Sheikh"]
+
+        for i in range(options['customers']):
+            full_name = f"{random.choice(first_names)} {random.choice(last_names)}"
+            cnic = f"{random.randint(10000, 99999):05d}-{random.randint(1000000, 9999999):07d}-{random.randint(1, 9)}"
+            phone = f"03{random.randint(0, 9):01d}{random.randint(10000000, 99999999):08d}"
+            cust = Customer.objects.create(
+                full_name=full_name,
+                cnic=cnic,
+                phone=phone,
+                address=f"{random.randint(1, 200)} {random.choice(['Main Blvd', 'Street', 'Road'])}, {random.choice(locations)}",
+                customer_type=random.choice(['INDIVIDUAL', 'JOINT', 'CORPORATE'])
+            )
+            customers.append(cust)
+        self.stdout.write(f"Created {len(customers)} customers")
+
+            # 4. Create Bookings (only on AVAILABLE plots)
+        available_plots = list(Plot.objects.filter(status='AVAILABLE'))  # ← convert to list
+        customers = list(customers)  # also convert to list for indexing
+
+        # Shuffle lists
+        random.shuffle(available_plots)
+        random.shuffle(customers)
+
+        bookings_created = 0
+        payment_plans = ['lump', '3yr', '5yr']
+
+        # Ensure we don't exceed available plots or customers
+        max_bookings = min(options['bookings'], len(available_plots), len(customers))
+
+        for i in range(max_bookings):
+            plot = available_plots[i]
+            customer = customers[i]
+            plan = random.choice(payment_plans)
+            total_price = plot.price
+            down_payment = int(total_price * random.uniform(0.1, 0.3))
+            booking_date = date.today() - timedelta(days=random.randint(0, 365))
+
+            booking = Booking.objects.create(
+                customer=customer,
+                plot=plot,
+                booking_date=booking_date,
+                total_price=total_price,
+                down_payment=down_payment,
+                payment_plan=plan,
+                status='ACTIVE',
+                booked_by=admin_user,
+                notes=f"Test booking {i+1}"
+            )
+            bookings_created += 1
+            # Update plot status to BOOKED
+            plot.status = 'BOOKED'
+            plot.save()
+
+        # # 5. Create some Expenses (approved and pending)
+        # expense_categories = ['Marketing', 'Utilities', 'Salaries', 'Maintenance', 'Legal', 'Taxes']
+        # expense_statuses = ['pending', 'approved', 'paid']
+
+        # for _ in range(30):
+        #     proj = random.choice(projects)
+        #     amount = random.randint(5000, 200000)
+        #     status = random.choice(expense_statuses)
+        #     expense = Expense.objects.create(
+        #         project=proj,
+        #         category=random.choice(expense_categories),
+        #         amount=amount,
+        #         vendor_name=f"Vendor {random.randint(1,20)}",
+        #         description=f"Expense for {proj.name}",
+        #         date=date.today() - timedelta(days=random.randint(1, 90)),
+        #         payment_method=random.choice(['Cash', 'Bank Transfer', 'Cheque']),
+        #         status=status,
+        #         submitted_by=admin_user,
+        #         approved_by=admin_user if status == 'approved' else None,
+        #     )
+        self.stdout.write("Created 30 sample expenses")
+
+        # 6. Randomly pay some installments (optional)
+        installments = Installment.objects.filter(status='PENDING')
+        for inst in installments[:random.randint(10, 30)]:
+            inst.status = 'PAID'
+            inst.amount_paid = inst.amount_due
+            inst.paid_on = date.today() - timedelta(days=random.randint(1, 30))
+            inst.save()
+        self.stdout.write("Paid some installments randomly")
+
+        self.stdout.write(self.style.SUCCESS("Database seeding completed!"))
