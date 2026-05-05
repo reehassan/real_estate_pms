@@ -1,81 +1,91 @@
 """
-Signals for the bookings app.
+apps/bookings/signals.py
 
-Key behaviors:
-1) Booking created   -> Plot.status = BOOKED
-2) Booking cancelled -> Plot.status = AVAILABLE
-3) Installment paid (when all of a booking's installments are paid)
-                      -> Booking.status = COMPLETED, Plot.status = SOLD
+Handles all Booking lifecycle → Plot status transitions.
+
+Transition map:
+    Booking created (active)        → Plot: available  → booked
+    Booking → cancelled             → Plot: booked     → available
+    Booking → completed             → Plot: booked     → sold
+    Booking → active (re-activated) → Plot: available  → booked
+
+Out of scope:
+    - Installment status updates (handled separately)
+    - Payment recording
+    - Overpayment / refund logic
 """
 
-from django.db import transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
-from .models import Booking, Installment
-from .utils import generate_installments
+from apps.bookings.models import Booking
+from apps.bookings.services.installment_service import generate_installments
 from apps.projects_and_plots.models import Plot
 
 
-@receiver(post_save, sender=Booking)
-def booking_post_save(sender, instance, created, **kwargs):
-    if created:
-        # Guard: if the booking is created already cancelled, do not reserve
-        # the plot (otherwise plot state becomes inconsistent).
-        if instance.status == Booking.Status.CANCELLED:
-            return
+# ─────────────────────────────────────────────
+# PRE-SAVE: capture previous status before DB write
+# ─────────────────────────────────────────────
 
-        # When a booking is created, mark the associated plot as booked.
-        # Plot.status uses the TextChoices values from Plot.Status.
-        if instance.plot.status != Plot.Status.BOOKED:
-            instance.plot.status = Plot.Status.BOOKED
-            instance.plot.save(update_fields=["status"])
-        generate_installments(instance)
+@receiver(pre_save, sender=Booking)
+def capture_previous_status(sender, instance, **kwargs):
+    """
+    Store the previous status on the instance so post_save can diff it.
+    New bookings (no pk yet) get _previous_status = None.
+    """
+    if instance.pk:
+        try:
+            instance._previous_status = Booking.all_objects.get(pk=instance.pk).status
+        except Booking.DoesNotExist:
+            instance._previous_status = None
     else:
-        # When a booking is cancelled, make the plot available again.
-        # Guard: once a plot is SOLD, cancelling should not flip it back to AVAILABLE.
-        if (
-            instance.status == Booking.Status.CANCELLED
-            and instance.plot.status != Plot.Status.AVAILABLE
-            and instance.plot.status != Plot.Status.SOLD
-        ):
-            instance.plot.status = Plot.Status.AVAILABLE
-            instance.plot.save(update_fields=["status"])
+        instance._previous_status = None
 
 
-@receiver(post_save, sender=Installment)
-def installment_post_save(sender, instance, created, **kwargs):
+# ─────────────────────────────────────────────
+# POST-SAVE: react to status transitions
+# ─────────────────────────────────────────────
+
+@receiver(post_save, sender=Booking)
+def sync_plot_status_and_generate_installments(sender, instance, created, **kwargs):
     """
-    When an installment becomes PAID and it's the last remaining unpaid installment
-    for the booking, finalize the booking and mark the plot as SOLD.
+    Keeps Plot.status in sync with Booking.status transitions.
+    Installments are generated only once, on booking creation.
     """
-    if instance.status != Installment.Status.PAID:
+    prev   = instance._previous_status
+    current = instance.status
+
+    if created:
+        # Brand-new booking — lock the plot and build the schedule.
+        _set_plot_status(instance.plot, Plot.Status.BOOKED)
+        generate_installments(instance)
         return
 
-    booking = instance.booking
-
-    # Guard against re-processing.
-    if booking.status in {Booking.Status.CANCELLED, Booking.Status.COMPLETED}:
+    # No status change — nothing to do (e.g. notes edit, price correction).
+    if prev == current:
         return
 
-    # Fast check before taking locks.
-    if booking.installments.exclude(status=Installment.Status.PAID).exists():
-        return
+    if current == Booking.Status.CANCELLED:
+        # Booking cancelled — release the plot back to market.
+        _set_plot_status(instance.plot, Plot.Status.AVAILABLE)
 
-    with transaction.atomic():
-        booking_locked = Booking.objects.select_for_update().get(pk=booking.pk)
-        if booking_locked.status in {Booking.Status.CANCELLED, Booking.Status.COMPLETED}:
-            return
+    elif current == Booking.Status.COMPLETED:
+        # Full payment received — ownership transferred.
+        _set_plot_status(instance.plot, Plot.Status.SOLD)
 
-        plot = Plot.objects.select_for_update().get(pk=booking_locked.plot_id)
+    elif current == Booking.Status.ACTIVE and prev == Booking.Status.CANCELLED:
+        # Booking re-activated after cancellation — re-lock the plot.
+        # Note: re-activating after COMPLETED is intentionally not handled;
+        # that would require a separate business decision.
+        _set_plot_status(instance.plot, Plot.Status.BOOKED)
 
-        # Re-check under lock to avoid edge cases during concurrent updates.
-        if booking_locked.installments.exclude(status=Installment.Status.PAID).exists():
-            return
 
-        booking_locked.status = Booking.Status.COMPLETED
-        booking_locked.save(update_fields=["status"])
+# ─────────────────────────────────────────────
+# HELPER
+# ─────────────────────────────────────────────
 
-        if plot.status != Plot.Status.SOLD:
-            plot.status = Plot.Status.SOLD
-            plot.save(update_fields=["status"])
+def _set_plot_status(plot, status: str) -> None:
+    """Single place to update plot status — easier to mock in tests."""
+    if plot.status != status:          # skip DB write if already correct
+        plot.status = status
+        plot.save(update_fields=['status', 'updated_at'])
