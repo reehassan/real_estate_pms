@@ -59,6 +59,19 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 
+# Redirect to dashboard after login
+LOGIN_REDIRECT_URL = '/'          
+
+# Redirect to login when unauthenticated
+LOGIN_URL = '/accounts/login/'
+
+# Django messages maps 'error' tag correctly
+from django.contrib.messages import constants as messages
+MESSAGE_TAGS = {
+    messages.ERROR: 'error',
+}
+
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
