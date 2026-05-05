@@ -30,9 +30,11 @@ class Project(models.Model):
         ON_HOLD   = 'ON_HOLD',   'On Hold'
         COMPLETED = 'COMPLETED', 'Completed'
 
-    # FEILDS
+    # FIELDS
     name          = models.CharField(max_length=100)
     location      = models.CharField(max_length=200)
+    code          = models.CharField(max_length=10, unique=True, help_text="Short project code, e.g., 'RBS' for Royal Bahria", default='ROLD')
+    total_plots   = models.PositiveIntegerField(default=0, help_text="Total number of plots in this project")
     total_area    = models.PositiveIntegerField()
     area_unit     = models.CharField(max_length=10, choices=AreaUnit.choices, default=AreaUnit.MARLA)
     description   = models.TextField(null=True, blank=True)
@@ -40,7 +42,7 @@ class Project(models.Model):
 
     # SOFT DELETE
     is_deleted    = models.BooleanField(default=False)
-    deleted_at    = models.DateTimeField(null=True, blank= True)
+    deleted_at    = models.DateTimeField(null=True, blank=True)
 
     # TIMESTAMPS
     created_at    = models.DateTimeField(auto_now_add=True)
@@ -50,12 +52,10 @@ class Project(models.Model):
     objects     = SoftDeleteManager()   # default — excludes deleted records
     all_objects = models.Manager()      # use only in admin or recovery
 
-
     class Meta:
         verbose_name            = 'Project'
         verbose_name_plural     = 'Projects'
-        ordering                =  ['-created_at']
-
+        ordering                = ['-created_at']
 
     def __str__(self):
         return f'{self.name} ({self.get_status_display()})'
@@ -80,48 +80,48 @@ class Plot(models.Model):
 
     class Status(models.TextChoices):
         AVAILABLE = 'AVAILABLE', 'Available'
-        TOKEN     = 'TOKEN'    , 'Token'
+        TOKEN     = 'TOKEN',     'Token'
         BOOKED    = 'BOOKED',    'Booked'
         SOLD      = 'SOLD',      'Sold'
 
     # RELATIONS
-    project     = models.ForeignKey(
-                    Project,
-                    on_delete=models.PROTECT,
-                    related_name='plots'
-                  )
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name='plots'
+    )
 
     # IDENTIFICATION
     plot_number = models.CharField(max_length=20)
     block       = models.CharField(max_length=50, null=True, blank=True)
 
     # PHYSICAL DETAILS
-    size        = models.DecimalField(
-                    max_digits=10,
-                    decimal_places=2,
-                    validators=[MinValueValidator(0.01)]
-                  )
-    size_unit   = models.CharField(max_length=10, choices=SizeUnit.choices, default=SizeUnit.MARLA)
-    category    = models.CharField(max_length=20, choices=Category.choices, default=Category.RESIDENTIAL)
+    size = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)]
+    )
+    size_unit = models.CharField(max_length=10, choices=SizeUnit.choices, default=SizeUnit.MARLA)
+    category  = models.CharField(max_length=20, choices=Category.choices, default=Category.RESIDENTIAL)
 
     # FINANCIALS
-    price       = models.DecimalField(
-                    max_digits=15,
-                    decimal_places=2,
-                    validators=[MinValueValidator(0.01)]
-                  )
+    price = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)]
+    )
 
     # STATUS
-    status      = models.CharField(max_length=15, choices=Status.choices, default=Status.AVAILABLE)
-    notes       = models.TextField(null=True, blank=True)
+    status = models.CharField(max_length=15, choices=Status.choices, default=Status.AVAILABLE)
+    notes  = models.TextField(null=True, blank=True)
 
     # SOFT DELETE
-    is_deleted  = models.BooleanField(default=False)
-    deleted_at  = models.DateTimeField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     # TIMESTAMPS
-    created_at  = models.DateTimeField(auto_now_add=True)
-    updated_at  = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     # MANAGERS
     objects     = SoftDeleteManager()
@@ -131,18 +131,19 @@ class Plot(models.Model):
         verbose_name        = 'Plot'
         verbose_name_plural = 'Plots'
         ordering            = ['project', 'block', 'plot_number']
-        constraints         = [
+        constraints = [
             models.UniqueConstraint(
                 fields=['project', 'plot_number'],
                 name='unique_plot_per_project'
             )
         ]
-        indexes             = [
+        indexes = [
             models.Index(fields=['status'], name='idx_plot_status')
         ]
 
     def __str__(self):
-        return f'{self.project.name} — {self.block or ""} {self.plot_number}'.strip()
+        block_part = f"{self.block} " if self.block else ""
+        return f'{self.project.name} — {block_part}{self.plot_number}'.strip()
 
     def delete(self, *args, **kwargs):
         self.is_deleted = True
