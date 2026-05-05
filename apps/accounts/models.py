@@ -15,20 +15,6 @@ from django.core.validators import RegexValidator
 from django.db import models
 
 
-# ─────────────────────────────────────────────
-# VALIDATORS
-# ─────────────────────────────────────────────
-
-phone_validator = RegexValidator(
-    regex=r'^\+?1?\d{9,15}$',
-    message='Enter a valid phone number. Up to 15 digits, optional + prefix.'
-)
-
-cnic_validator = RegexValidator(
-    regex=r'^\d{5}-\d{7}-\d{1}$',
-    message='Enter a valid Pakistani CNIC in format XXXXX-XXXXXXX-X.'
-)
-
 
 # ─────────────────────────────────────────────
 # MODELS
@@ -36,8 +22,6 @@ cnic_validator = RegexValidator(
 
 class User(AbstractUser):
     email = models.EmailField(unique=True, blank=False)
-    phone = models.CharField(max_length=20, blank=True, validators=[phone_validator])
-    cnic  = models.CharField(max_length=15, unique=True, null=True, blank=True, validators=[cnic_validator])
 
     REQUIRED_FIELDS = ['email', 'first_name', 'last_name']
 
