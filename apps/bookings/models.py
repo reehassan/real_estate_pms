@@ -13,6 +13,7 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 
 # ─────────────────────────────────────────────
@@ -78,6 +79,7 @@ class Booking(models.Model):
                    )
     notes        = models.TextField(null=True, blank=True)
 
+
     # SOFT DELETE
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -89,6 +91,9 @@ class Booking(models.Model):
     # MANAGERS
     objects     = SoftDeleteManager()
     all_objects = models.Manager()
+
+        # HISTORY
+    history = HistoricalRecords()
 
     def __str__(self):
         return f'{self.customer.full_name} — Plot {self.plot.plot_number}'
@@ -160,8 +165,12 @@ class Installment(models.Model):
                          )
     notes              = models.TextField(null=True, blank=True)
 
+
     # TIMESTAMPS
     created_at = models.DateTimeField(auto_now_add=True)
+
+        # HISTORY
+    history = HistoricalRecords()
 
     def __str__(self):
         return f'{self.challan_number} ({self.get_status_display()})'

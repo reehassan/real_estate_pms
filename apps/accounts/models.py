@@ -13,6 +13,7 @@ rely entirely on Django's built-in permission system:
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import RegexValidator
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
 
@@ -24,6 +25,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True, blank=False)
 
     REQUIRED_FIELDS = ['email', 'first_name', 'last_name']
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = 'User'

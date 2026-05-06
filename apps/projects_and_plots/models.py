@@ -7,6 +7,7 @@ Represents a housing scheme or development project.
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 # MANAGERS
 class SoftDeleteManager(models.Manager):
@@ -32,7 +33,13 @@ class Project(models.Model):
 
     # FIELDS
     name          = models.CharField(max_length=100)
-    location      = models.CharField(max_length=200)
+    location      = models.CharField(max_length=200,
+    help_text='Full office/contact address printed on payment challans')
+    logo = models.ImageField(
+    upload_to="projects/logos/",
+    null=True, blank=True,
+    help_text="Wide banner (recommended 800×200 px)",
+    )
     code          = models.CharField(max_length=10, unique=True, help_text="Short project code, e.g., 'RBS' for Royal Bahria", default='ROLD')
     total_plots   = models.PositiveIntegerField(default=0, help_text="Total number of plots in this project")
     total_area    = models.PositiveIntegerField()
@@ -47,6 +54,9 @@ class Project(models.Model):
     # TIMESTAMPS
     created_at    = models.DateTimeField(auto_now_add=True)
     updated_at    = models.DateTimeField(auto_now=True)
+
+    # HISTORY
+    history = HistoricalRecords()
 
     # MANAGERS
     objects     = SoftDeleteManager()   # default — excludes deleted records
@@ -122,6 +132,9 @@ class Plot(models.Model):
     # TIMESTAMPS
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # HISTORY
+    history = HistoricalRecords()
 
     # MANAGERS
     objects     = SoftDeleteManager()

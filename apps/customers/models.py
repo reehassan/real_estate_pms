@@ -9,6 +9,7 @@ Represents a person or entity that books or buys a plot.
 from django.db import models
 from django.core.validators import RegexValidator
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 
 # ─────────────────────────────────────────────
@@ -54,7 +55,7 @@ class Customer(models.Model):
                         validators=[cnic_validator],
                         help_text='Format: XXXXX-XXXXXXX-X'
                     )
-    phone         = models.CharField(max_length=15, validators=[phone_validator])
+    phone         = models.CharField(max_length=15, validators=[phone_validator],  help_text='Format: 03001234567 or +923001234567')
     address       = models.TextField()
     customer_type = models.CharField(
                         max_length=15,
@@ -69,6 +70,9 @@ class Customer(models.Model):
     # TIMESTAMPS
     created_at    = models.DateTimeField(auto_now_add=True)
     updated_at    = models.DateTimeField(auto_now=True)
+
+    # HISTORY
+    history = HistoricalRecords()
 
     # MANAGERS
     objects       = SoftDeleteManager()
