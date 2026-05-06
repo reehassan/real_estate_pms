@@ -1,0 +1,64 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls jazzmin %}
+
+{% block object-tools %}
+<div class="object-tools">
+    {% block object-tools-items %}
+        {# Jazzmin’s built‑in buttons (Add, etc.) #}
+        {% jazzmin_object_tools %}
+
+        {# Import button (standard) #}
+        {% if has_import_permission %}
+        <li>
+            <a href="{% url cl.opts|admin_urlname:'import' %}" class="btn btn-primary">
+                <i class="fas fa-file-import"></i> {% trans "Import" %}
+            </a>
+        </li>
+        {% endif %}
+
+        {# Our custom Export‑selected button #}
+        <li>
+            <a href="javascript:void(0);"
+               class="btn btn-success"
+               id="export-selected-btn"
+               onclick="exportSelectedItems()">
+                <i class="fas fa-file-export"></i> {% trans "Export selected" %}
+            </a>
+        </li>
+    {% endblock %}
+</div>
+
+<script type="text/javascript">
+    function exportSelectedItems() {
+        // Check if at least one item is selected
+        var checkboxes = document.querySelectorAll('.action-select:checked');
+        if (checkboxes.length === 0) {
+            alert("{% trans 'Please select at least one item to export.' %}");
+            return;
+        }
+
+        // Find the changelist form (standard Django admin id)
+        var form = document.getElementById('changelist-form');
+        if (!form) {
+            alert("Form not found. Contact support.");
+            return;
+        }
+
+        // Set the action dropdown to the export_admin_action value
+        var actionSelect = document.querySelector('select[name="action"]');
+        if (actionSelect) {
+            actionSelect.value = 'export_admin_action';
+        } else {
+            // Fallback: create a hidden input if it's not a select
+            var hiddenAction = document.createElement('input');
+            hiddenAction.type = 'hidden';
+            hiddenAction.name = 'action';
+            hiddenAction.value = 'export_admin_action';
+            form.appendChild(hiddenAction);
+        }
+
+        // Submit the form – only the selected checkboxes (named '_selected_action') will be sent
+        form.submit();
+    }
+</script>
+{% endblock %}

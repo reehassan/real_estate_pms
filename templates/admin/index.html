@@ -1,0 +1,446 @@
+{% extends "admin/base_site.html" %}
+{% load i18n humanize %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  /* Scoped only to dashboard — doesn't touch Unfold's own styles */
+  .pms-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px 24px;
+  }
+  .dark .pms-card {
+    background: #1f2937;
+    border-color: #374151;
+  }
+  .pms-kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: #6b7280;
+  }
+  .dark .pms-kpi-label { color: #9ca3af; }
+  .pms-kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+    margin-top: 4px;
+    white-space: nowrap;
+  }
+  .dark .pms-kpi-value { color: #f9fafb; }
+  .pms-kpi-sub {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+  .dark .pms-kpi-sub { color: #9ca3af; }
+  .pms-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #374151;
+    letter-spacing: .3px;
+    margin-bottom: 14px;
+  }
+  .dark .pms-section-title { color: #d1d5db; }
+  .pms-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pms-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    color: #9ca3af;
+    padding: 0 8px 10px 8px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .dark .pms-table th { border-color: #374151; }
+  .pms-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151;
+    vertical-align: middle;
+  }
+  .dark .pms-table td { border-color: #374151; color: #d1d5db; }
+  .pms-table tr:last-child td { border-bottom: none; }
+  .pms-badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .pms-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .pms-grid-4  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .pms-grid-2  { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .pms-grid-32 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+  @media (max-width: 1100px) {
+    .pms-grid-4  { grid-template-columns: repeat(2, 1fr); }
+    .pms-grid-32 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .pms-grid-4, .pms-grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding: 24px; max-width: 1400px;">
+
+  {# ── Page header ─────────────────────────────────────────── #}
+  <div style="margin-bottom: 24px; display:flex; align-items:center; justify-content:space-between;">
+    <div>
+      <h1 style="font-size:20px;font-weight:700;color:#111827;margin:0" class="dark:text-white">
+        Dashboard
+      </h1>
+      <p style="font-size:13px;color:#6b7280;margin:2px 0 0 0">
+        {{ today|date:"l, d F Y" }}
+      </p>
+    </div>
+  </div>
+
+  {# ── KPI Row 1: Money ────────────────────────────────────── #}
+  <div class="pms-grid-4" style="margin-bottom:14px">
+
+    <div class="pms-card" style="display:flex;gap:14px;align-items:flex-start">
+      {% comment %} <div class="pms-icon" style="background:#dcfce7">💰</div> {% endcomment %}
+      <div>
+        <div class="pms-kpi-label">Total Collected</div>
+        <div class="pms-kpi-value">PKR {{ total_collected|floatformat:0|intcomma }}</div>
+        <div class="pms-kpi-sub">All time</div>
+      </div>
+    </div>
+
+    <div class="pms-card" style="display:flex;gap:14px;align-items:flex-start">
+      {% comment %} <div class="pms-icon" style="background:#fef9c3">⏳</div> {% endcomment %}
+      <div>
+        <div class="pms-kpi-label">Outstanding</div>
+        <div class="pms-kpi-value" style="color:#d97706">PKR {{ outstanding|floatformat:0|intcomma }}</div>
+        <div class="pms-kpi-sub">Pending + overdue</div>
+      </div>
+    </div>
+
+    <div class="pms-card" style="display:flex;gap:14px;align-items:flex-start">
+      {% comment %} <div class="pms-icon" style="background:#dbeafe">📅</div> {% endcomment %}
+      <div>
+        <div class="pms-kpi-label">Collected This Month</div>
+        <div class="pms-kpi-value">PKR {{ this_month_collected|floatformat:0|intcomma }}</div>
+        <div class="pms-kpi-sub">{{ today|date:"F Y" }}</div>
+      </div>
+    </div>
+
+    <div class="pms-card" style="display:flex;gap:14px;align-items:flex-start">
+      {% comment %} <div class="pms-icon" style="background:#fce7f3">🧾</div> {% endcomment %}
+      <div>
+        <div class="pms-kpi-label">Expenses This Month</div>
+        <div class="pms-kpi-value" style="color:#db2777">PKR {{ expenses_this_month|floatformat:0|intcomma }}</div>
+        <div class="pms-kpi-sub">{{ today|date:"F Y" }}</div>
+      </div>
+    </div>
+
+  </div>
+
+  {# ── KPI Row 2: Operations ───────────────────────────────── #}
+  <div class="pms-grid-4" style="margin-bottom:24px">
+
+    <div class="pms-card" style="display:flex;gap:14px;align-items:flex-start">
+      {% comment %} <div class="pms-icon" style="background:#ede9fe">📋</div> {% endcomment %}
+      <div>
+        <div class="pms-kpi-label">Active Bookings</div>
+        <div class="pms-kpi-value">{{ active_bookings }}</div>
+        <div class="pms-kpi-sub">{{ collection_rate }}% collection rate</div>
+      </div>
+    </div>
+
+    <div class="pms-card" style="display:flex;gap:14px;align-items:flex-start">
+      {% comment %} <div class="pms-icon" style="background:#dcfce7">🏠</div> {% endcomment %}
+      <div>
+        <div class="pms-kpi-label">Available Plots</div>
+        <div class="pms-kpi-value" style="color:#16a34a">{{ available_plots }}</div>
+        <div class="pms-kpi-sub">{{ booked_plots }} booked of {{ total_plots }}</div>
+      </div>
+    </div>
+
+    <div class="pms-card" style="display:flex;gap:14px;align-items:flex-start">
+      {% comment %} <div class="pms-icon" style="background:#fee2e2">⚠️</div> {% endcomment %}
+      <div>
+        <div class="pms-kpi-label">Overdue Installments</div>
+        <div class="pms-kpi-value" style="color:#dc2626">{{ overdue_count }}</div>
+        <div class="pms-kpi-sub">PKR {{ overdue_amount|floatformat:0|intcomma }} at risk</div>
+      </div>
+    </div>
+
+    <div class="pms-card" style="display:flex;gap:14px;align-items:flex-start">
+      {% comment %} <div class="pms-icon" style="background:#fff7ed">🔔</div> {% endcomment %}
+      <div>
+        <div class="pms-kpi-label">Due in 7 Days</div>
+        <div class="pms-kpi-value" style="color:#ea580c">{{ due_in_7 }}</div>
+        <div class="pms-kpi-sub">{{ new_customers }} new customers this month</div>
+      </div>
+    </div>
+
+  </div>
+
+  {# ── Charts row ──────────────────────────────────────────── #}
+  <div class="pms-grid-32" style="margin-bottom:24px">
+
+    {# Revenue vs Expense — bar chart #}
+    <div class="pms-card">
+      <div class="pms-section-title">Monthly Revenue vs Expenses (Last 12 Months)</div>
+      <div style="height:260px; position:relative">
+        <canvas id="revenueChart"></canvas>
+      </div>
+    </div>
+
+    {# Plot status — donut #}
+    <div class="pms-card">
+      <div class="pms-section-title">Plot Status</div>
+      <div style="height:200px; position:relative; margin: 0 auto; max-width:200px">
+        <canvas id="plotChart"></canvas>
+      </div>
+      <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; justify-content:center">
+        {% with labels=plot_status_labels|default:"" %}
+          <span class="pms-badge" style="background:#16a34a">Available: {{ available_plots }}</span>
+          <span class="pms-badge" style="background:#2563eb">Booked: {{ booked_plots }}</span>
+          <span class="pms-badge" style="background:#7c3aed">Sold</span>
+          <span class="pms-badge" style="background:#d97706">Token</span>
+        {% endwith %}
+      </div>
+    </div>
+
+  </div>
+
+  {# ── Tables row ──────────────────────────────────────────── #}
+  <div class="pms-grid-2" style="margin-bottom:24px">
+
+    {# Recent Bookings #}
+    <div class="pms-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="pms-section-title" style="margin-bottom:0">Recent Bookings</div>
+        <a href="{% url 'admin:bookings_booking_changelist' %}"
+           style="font-size:12px;color:#7c3aed;font-weight:600;text-decoration:none">
+          View all →
+        </a>
+      </div>
+      <table class="pms-table">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Plot</th>
+            <th>Plan</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in recent_bookings %}
+          <tr>
+            <td>
+              <a href="{% url 'admin:bookings_booking_change' b.pk %}"
+                 style="color:#7c3aed;font-weight:600;text-decoration:none">
+                {{ b.customer.full_name }}
+              </a>
+              <div style="font-size:11px;color:#9ca3af">{{ b.booking_date }}</div>
+            </td>
+            <td>
+              {{ b.plot.plot_number }}
+              <div style="font-size:11px;color:#9ca3af">{{ b.plot.project.name }}</div>
+            </td>
+            <td>{{ b.get_payment_plan_display }}</td>
+            <td>
+              {% if b.status == "active" %}
+                <span class="pms-badge" style="background:#16a34a">Active</span>
+              {% elif b.status == "completed" %}
+                <span class="pms-badge" style="background:#2563eb">Completed</span>
+              {% else %}
+                <span class="pms-badge" style="background:#dc2626">Cancelled</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" style="text-align:center;color:#9ca3af;padding:20px">No bookings yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Overdue Installments #}
+    <div class="pms-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="pms-section-title" style="margin-bottom:0">
+          Overdue Installments
+          {% if overdue_count %}<span class="pms-badge" style="background:#dc2626;margin-left:6px">{{ overdue_count }}</span>{% endif %}
+        </div>
+        <a href="{% url 'admin:bookings_installment_changelist' %}?status=overdue"
+           style="font-size:12px;color:#dc2626;font-weight:600;text-decoration:none">
+          View all →
+        </a>
+      </div>
+      <table class="pms-table">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Due Date</th>
+            <th>Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in overdue_list %}
+          <tr>
+            <td>
+              <div style="font-weight:600">{{ i.booking.customer.full_name }}</div>
+              <div style="font-size:11px;color:#9ca3af">{{ i.booking.plot.plot_number }} · {{ i.challan_number }}</div>
+            </td>
+            <td>
+              <span style="color:#dc2626;font-weight:600">{{ i.due_date }}</span>
+              <div style="font-size:11px;color:#9ca3af">
+                {{ today|timeuntil:i.due_date }} overdue
+              </div>
+            </td>
+            <td style="font-weight:600;color:#dc2626">
+              PKR {{ i.amount_due|floatformat:0|intcomma }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" style="text-align:center;color:#16a34a;padding:20px">✓ No overdue installments</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  {# ── Upcoming due in 7 days ───────────────────────────────── #}
+  {% if upcoming_list %}
+  <div class="pms-card" style="margin-bottom:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="pms-section-title" style="margin-bottom:0">
+        Due in Next 7 Days
+        <span class="pms-badge" style="background:#ea580c;margin-left:6px">{{ due_in_7 }}</span>
+      </div>
+    </div>
+    <table class="pms-table">
+      <thead>
+        <tr>
+          <th>Challan</th>
+          <th>Customer</th>
+          <th>Plot</th>
+          <th>Due Date</th>
+          <th>Amount Due</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in upcoming_list %}
+        <tr>
+          <td style="font-family:monospace;font-size:12px">{{ i.challan_number }}</td>
+          <td style="font-weight:600">{{ i.booking.customer.full_name }}</td>
+          <td>{{ i.booking.plot.plot_number }}</td>
+          <td>
+            {{ i.due_date }}
+            {% if i.due_date == today %}
+              <span class="pms-badge" style="background:#ea580c;margin-left:4px">Today</span>
+            {% endif %}
+          </td>
+          <td style="font-weight:600">PKR {{ i.amount_due|floatformat:0|intcomma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+
+{# ── Chart.js initialization ─────────────────────────────── #}
+<script>
+(function () {
+  const isDark = document.documentElement.classList.contains('dark');
+  const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+  const textColor = isDark ? '#9ca3af' : '#6b7280';
+
+  const pkr = v => 'PKR ' + Number(v).toLocaleString('en-PK', {maximumFractionDigits: 0});
+
+  // Revenue vs Expense chart
+  new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+      labels: {{ chart_labels|safe }},
+      datasets: [
+        {
+          label: 'Revenue Collected',
+          data: {{ revenue_data|safe }},
+          backgroundColor: 'rgba(124, 58, 237, 0.8)',
+          borderRadius: 4,
+          order: 2,
+        },
+        {
+          label: 'Expenses',
+          data: {{ expense_data|safe }},
+          backgroundColor: 'rgba(220, 38, 38, 0.7)',
+          borderRadius: 4,
+          order: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: textColor, font: { size: 12 } } },
+        tooltip: {
+          callbacks: { label: ctx => ' ' + pkr(ctx.parsed.y) }
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: textColor, font: { size: 11 } },
+          grid: { color: gridColor },
+        },
+        y: {
+          ticks: {
+            color: textColor,
+            font: { size: 11 },
+            callback: v => 'PKR ' + (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : (v/1000).toFixed(0)+'K'),
+          },
+          grid: { color: gridColor },
+        },
+      },
+    },
+  });
+
+  // Plot status donut
+  new Chart(document.getElementById('plotChart'), {
+    type: 'doughnut',
+    data: {
+      labels: {{ plot_status_labels|safe }},
+      datasets: [{
+        data: {{ plot_status_data|safe }},
+        backgroundColor: {{ plot_status_colors|safe }},
+        borderWidth: 0,
+        hoverOffset: 6,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '70%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed }
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endblock %}
