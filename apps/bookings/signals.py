@@ -4,15 +4,18 @@ apps/bookings/signals.py
 Handles all Booking lifecycle → Plot status transitions.
 
 Transition map:
-    Booking created (active)        → Plot: available  → booked
-    Booking → cancelled             → Plot: booked     → available
-    Booking → completed             → Plot: booked     → sold
-    Booking → active (re-activated) → Plot: available  → booked
+    Booking created (TOKEN)         → Plot: available  → token
+    Booking created (ACTIVE)        → Plot: available  → booked  + generate installments
+    Booking TOKEN   → ACTIVE        → Plot: token      → booked  + generate installments
+    Booking → CANCELLED             → Plot: token/booked → available
+    Booking → COMPLETED             → Plot: booked     → sold
+    Booking ACTIVE  → TOKEN         → not allowed (handled by guard, no transition)
 
 Out of scope:
-    - Installment status updates (handled separately)
+    - Installment status updates (handled by management command)
     - Payment recording
     - Overpayment / refund logic
+    - Re-activation after COMPLETED
 """
 
 from django.db.models.signals import post_save, pre_save
@@ -24,7 +27,7 @@ from apps.projects_and_plots.models import Plot
 
 
 # ─────────────────────────────────────────────
-# PRE-SAVE: capture previous status before DB write
+# PRE-SAVE: capture previous status
 # ─────────────────────────────────────────────
 
 @receiver(pre_save, sender=Booking)
@@ -35,7 +38,9 @@ def capture_previous_status(sender, instance, **kwargs):
     """
     if instance.pk:
         try:
-            instance._previous_status = Booking.all_objects.get(pk=instance.pk).status
+            instance._previous_status = (
+                Booking.all_objects.get(pk=instance.pk).status
+            )
         except Booking.DoesNotExist:
             instance._previous_status = None
     else:
@@ -50,34 +55,50 @@ def capture_previous_status(sender, instance, **kwargs):
 def sync_plot_status_and_generate_installments(sender, instance, created, **kwargs):
     """
     Keeps Plot.status in sync with Booking.status transitions.
-    Installments are generated only once, on booking creation.
+    Installment generation happens only on TOKEN → ACTIVE transition
+    (or on creation if booking is created directly as ACTIVE).
     """
-    prev   = instance._previous_status
+    prev    = instance._previous_status
     current = instance.status
 
     if created:
-        # Brand-new booking — lock the plot and build the schedule.
-        _set_plot_status(instance.plot, Plot.Status.BOOKED)
-        generate_installments(instance)
+        if current == Booking.Status.TOKEN:
+            # Token received — hold the plot at TOKEN stage
+            _set_plot_status(instance.plot, Plot.Status.TOKEN)
+
+        elif current == Booking.Status.ACTIVE:
+            # Booking created directly as ACTIVE (down payment already collected)
+            # Lock the plot and generate the full installment schedule
+            _set_plot_status(instance.plot, Plot.Status.BOOKED)
+            generate_installments(instance)
+
         return
 
-    # No status change — nothing to do (e.g. notes edit, price correction).
+    # ── Existing booking — handle status transitions ───────────────
+
+    # No status change — nothing to do (notes edit, price correction etc.)
     if prev == current:
         return
 
-    if current == Booking.Status.CANCELLED:
-        # Booking cancelled — release the plot back to market.
+    if current == Booking.Status.ACTIVE and prev == Booking.Status.TOKEN:
+        # Down payment collected — formalize the booking
+        # Plot moves from TOKEN → BOOKED and schedule is generated
+        _set_plot_status(instance.plot, Plot.Status.BOOKED)
+        generate_installments(instance)
+
+    elif current == Booking.Status.CANCELLED:
+        # Booking cancelled at any stage — release plot back to market
         _set_plot_status(instance.plot, Plot.Status.AVAILABLE)
 
     elif current == Booking.Status.COMPLETED:
-        # Full payment received — ownership transferred.
+        # All installments paid — ownership transferred
         _set_plot_status(instance.plot, Plot.Status.SOLD)
 
     elif current == Booking.Status.ACTIVE and prev == Booking.Status.CANCELLED:
-        # Booking re-activated after cancellation — re-lock the plot.
-        # Note: re-activating after COMPLETED is intentionally not handled;
-        # that would require a separate business decision.
+        # Re-activated after cancellation — re-lock the plot
+        # Note: re-activating after COMPLETED is intentionally not handled
         _set_plot_status(instance.plot, Plot.Status.BOOKED)
+        generate_installments(instance)
 
 
 # ─────────────────────────────────────────────
@@ -86,6 +107,6 @@ def sync_plot_status_and_generate_installments(sender, instance, created, **kwar
 
 def _set_plot_status(plot, status: str) -> None:
     """Single place to update plot status — easier to mock in tests."""
-    if plot.status != status:          # skip DB write if already correct
+    if plot.status != status:
         plot.status = status
         plot.save(update_fields=['status', 'updated_at'])
