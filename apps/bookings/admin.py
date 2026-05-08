@@ -1,20 +1,23 @@
 """
 apps/bookings/admin.py
 
-Production-grade Unfold admin for Booking + Installment models.
+Production-grade Unfold admin for Booking + Installment + BookingDocument models.
 
 Features:
     - Unfold label={} badges on all status fields
     - Import / Export (CSV + XLSX) for both models
-    - AdminConfirmMixin on permission-sensitive saves
+    - AdminConfirmMixin on status changes
     - Date-range filters on booking_date, due_date, paid_on
     - Annotated outstanding balance (no N+1)
+    - Token + down payment fields in fieldsets
     - Payment summary panel (dark-mode safe)
+    - BookingDocument inline
     - Soft-delete aware
 """
 
 from django.contrib import admin
-from django.db.models import Sum, Q
+from django.db.models import Sum
+from django.urls import reverse
 from django.utils.html import mark_safe
 from django.utils.translation import gettext_lazy as _
 
@@ -22,15 +25,13 @@ from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
 from rangefilter.filters import DateRangeFilterBuilder
 from admin_confirm import AdminConfirmMixin
+from simple_history.admin import SimpleHistoryAdmin
 
 from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from unfold.admin import TabularInline as UnfoldTabularInline
 from unfold.decorators import display
-from simple_history.admin import SimpleHistoryAdmin
-from simple_history.models import HistoricalRecords
 
-from .models import Booking, Installment
-from django.urls import reverse
+from .models import Booking, Installment, BookingDocument
 
 
 # ─────────────────────────────────────────────
@@ -38,7 +39,6 @@ from django.urls import reverse
 # ─────────────────────────────────────────────
 
 def _pkr(value) -> str:
-    """Consistent Pakistani Rupee formatting across the admin."""
     if value is None:
         return "—"
     return f"₨ {value:,.0f}"
@@ -56,13 +56,15 @@ class BookingResource(resources.ModelResource):
     booked_by_email = fields.Field(column_name="Booked By")
 
     class Meta:
-        model        = Booking
-        skip_unchanged  = True
-        report_skipped  = False
+        model          = Booking
+        skip_unchanged = True
+        report_skipped = False
         fields = (
             "id", "customer_name", "customer_cnic",
             "plot_number", "project_name", "booking_date",
-            "payment_plan", "total_price", "down_payment",
+            "payment_plan", "total_price",
+            "token_amount", "token_received_on",
+            "down_payment", "down_payment_received_on",
             "status", "booked_by_email", "created_at",
         )
         export_order = fields
@@ -88,9 +90,9 @@ class InstallmentResource(resources.ModelResource):
     plot_number   = fields.Field(column_name="Plot Number")
 
     class Meta:
-        model        = Installment
-        skip_unchanged  = True
-        report_skipped  = False
+        model          = Installment
+        skip_unchanged = True
+        report_skipped = False
         fields = (
             "id", "challan_number", "booking", "customer_name",
             "plot_number", "installment_number", "due_date",
@@ -106,7 +108,7 @@ class InstallmentResource(resources.ModelResource):
 
 
 # ─────────────────────────────────────────────
-# INLINE
+# INLINES
 # ─────────────────────────────────────────────
 
 class InstallmentInline(UnfoldTabularInline):
@@ -117,25 +119,14 @@ class InstallmentInline(UnfoldTabularInline):
     classes          = ["collapse"]
     fields = (
         "challan_number", "installment_number", "due_date",
-        "amount_due", "amount_paid", "paid_on", "installment_status",
-        "challan_link",   
+        "amount_due", "amount_paid", "paid_on",
+        "installment_status", "challan_link",
     )
     readonly_fields = (
         "challan_number", "installment_number", "due_date",
-        "amount_due", "amount_paid", "paid_on", "installment_status",
-        "challan_link",
+        "amount_due", "amount_paid", "paid_on",
+        "installment_status", "challan_link",
     )
-
-    @display(description=_("Challan"))
-    def challan_link(self, obj):
-        if not obj.pk:
-            return "—"
-        url = reverse("challans:pdf", args=[obj.pk])
-        return mark_safe(
-            f'<a href="{url}" target="_blank" '
-            f'style="color:#7c3aed;font-weight:600;font-size:11px;">'
-            f'↓ PDF</a>'
-        )
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("booking")
@@ -152,12 +143,44 @@ class InstallmentInline(UnfoldTabularInline):
     def installment_status(self, obj):
         return obj.get_status_display()
 
+    @display(description=_("Challan"))
+    def challan_link(self, obj):
+        if not obj.pk:
+            return "—"
+        url = reverse("challans:pdf", args=[obj.pk])
+        return mark_safe(
+            f'<a href="{url}" target="_blank" '
+            f'style="color:#7c3aed;font-weight:600;font-size:11px;">↓ PDF</a>'
+        )
+
+
+class BookingDocumentInline(UnfoldTabularInline):
+    model            = BookingDocument
+    extra            = 1
+    can_delete       = True
+    show_change_link = False
+    fields           = ("doc_type", "file", "notes", "uploaded_by", "uploaded_at")
+    readonly_fields  = ("uploaded_by", "uploaded_at")
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            obj.uploaded_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.uploaded_by = request.user
+            instance.save()
+        formset.save_m2m()
+
 
 # ─────────────────────────────────────────────
 # BULK ACTIONS — Bookings
 # ─────────────────────────────────────────────
 
-@admin.action(description="  Mark selected bookings as Completed")
+@admin.action(description="✅  Mark selected bookings as Completed")
 def mark_completed(modeladmin, request, queryset):
     updated = queryset.filter(status=Booking.Status.ACTIVE).update(
         status=Booking.Status.COMPLETED,
@@ -165,10 +188,10 @@ def mark_completed(modeladmin, request, queryset):
     modeladmin.message_user(request, f"{updated} booking(s) marked Completed.")
 
 
-@admin.action(description="  Mark selected bookings as Cancelled")
+@admin.action(description="🚫  Mark selected bookings as Cancelled")
 def mark_cancelled(modeladmin, request, queryset):
     updated = queryset.filter(
-        status__in=[Booking.Status.ACTIVE, Booking.Status.CONFIRMED]
+        status__in=[Booking.Status.TOKEN, Booking.Status.ACTIVE]
     ).update(status=Booking.Status.CANCELLED)
     modeladmin.message_user(request, f"{updated} booking(s) marked Cancelled.")
 
@@ -177,7 +200,7 @@ def mark_cancelled(modeladmin, request, queryset):
 # BULK ACTIONS — Installments
 # ─────────────────────────────────────────────
 
-@admin.action(description="  Mark selected installments as Overdue")
+@admin.action(description="⚠️  Mark selected installments as Overdue")
 def mark_overdue(modeladmin, request, queryset):
     updated = queryset.filter(status=Installment.Status.PENDING).update(
         status=Installment.Status.OVERDUE,
@@ -191,16 +214,9 @@ def mark_overdue(modeladmin, request, queryset):
 
 @admin.register(Booking)
 class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin, UnfoldModelAdmin):
-    """
-    MRO:
-      AdminConfirmMixin      — confirmation page before saving status changes
-      ImportExportModelAdmin — Export / Import buttons (Unfold-styled)
-      UnfoldModelAdmin       — Unfold base (must be last)
-    """
     resource_classes    = [BookingResource]
-    confirmation_fields = ["status"]    # triggers confirmation page on status change
+    confirmation_fields = ["status"]
 
-    # ── Unfold UI ──────────────────────────────────────────────────
     compressed_fields  = True
     warn_unsaved_form  = True
     list_filter_submit = True
@@ -213,6 +229,7 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
         "booking_date",
         "payment_plan",
         "total_price_display",
+        "token_display",
         "down_payment_display",
         "outstanding_display",
         "status_badge",
@@ -241,7 +258,7 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
     # ── Change form ────────────────────────────────────────────────
     autocomplete_fields = ["customer", "plot", "booked_by"]
     readonly_fields     = ("created_at", "updated_at", "payment_summary")
-    inlines             = [InstallmentInline]
+    inlines             = [InstallmentInline, BookingDocumentInline]
 
     fieldsets = (
         (
@@ -256,10 +273,38 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
             },
         ),
         (
+            _("Token Payment"),
+            {
+                "fields": (
+                    ("token_amount", "token_received_on"),
+                ),
+                "classes": ["wide"],
+                "description": (
+                    "Initial amount received to hold the plot. "
+                    "Set status to TOKEN on creation. "
+                    "Deducted from the installment principal."
+                ),
+            },
+        ),
+        (
+            _("Down Payment"),
+            {
+                "fields": (
+                    ("down_payment", "down_payment_received_on"),
+                ),
+                "classes": ["wide"],
+                "description": (
+                    "Once down payment is received, set down_payment_received_on "
+                    "and change status to ACTIVE. "
+                    "Installments will be generated automatically."
+                ),
+            },
+        ),
+        (
             _("Financials"),
             {
                 "fields": (
-                    ("total_price", "down_payment"),
+                    "total_price",
                     "payment_summary",
                 ),
                 "classes": ["wide"],
@@ -294,9 +339,23 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
             },
         ),
         (
-            _("Financials"),
+            _("Token Payment"),
             {
-                "fields": (("total_price", "down_payment"),),
+                "fields": (("token_amount", "token_received_on"),),
+                "classes": ["wide"],
+            },
+        ),
+        (
+            _("Down Payment"),
+            {
+                "fields": (("down_payment", "down_payment_received_on"),),
+                "classes": ["wide"],
+            },
+        ),
+        (
+            _("Total Price"),
+            {
+                "fields": ("total_price",),
                 "classes": ["wide"],
             },
         ),
@@ -314,7 +373,7 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
             return self.add_fieldsets
         return super().get_fieldsets(request, obj)
 
-    # ── Queryset — annotate outstanding to avoid N+1 ───────────────
+    # ── Queryset ───────────────────────────────────────────────────
 
     def get_queryset(self, request):
         return (
@@ -334,11 +393,10 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
         description=_("Status"),
         ordering="status",
         label={
-            "Draft":     "secondary",
-            "Confirmed": "primary",
-            "Active":    "success",
-            "Cancelled": "danger",
-            "Expired":   "warning",
+            "Token":     "warning",    # amber  — partial commitment
+            "Active":    "success",    # emerald — running
+            "Completed": "secondary",  # slate  — done
+            "Cancelled": "danger",     # rose   — void
         },
     )
     def status_badge(self, obj):
@@ -360,23 +418,38 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
     def total_price_display(self, obj):
         return _pkr(obj.total_price)
 
+    @display(description=_("Token"), ordering="token_amount")
+    def token_display(self, obj):
+        if not obj.token_amount:
+            return "—"
+        colour = "#16a34a" if obj.token_received_on else "#d97706"
+        return mark_safe(
+            f'<span style="color:{colour};font-weight:600;">'
+            f'{_pkr(obj.token_amount)}</span>'
+        )
+
     @display(description=_("Down Payment"), ordering="down_payment")
     def down_payment_display(self, obj):
-        return _pkr(obj.down_payment)
+        if not obj.down_payment:
+            return "—"
+        colour = "#16a34a" if obj.down_payment_received_on else "#d97706"
+        return mark_safe(
+            f'<span style="color:{colour};font-weight:600;">'
+            f'{_pkr(obj.down_payment)}</span>'
+        )
 
     @display(description=_("Outstanding"), ordering="_total_due")
     def outstanding_display(self, obj):
-        # Uses annotated values — no extra query per row
-        total_due  = getattr(obj, "_total_due",  None) or 0
-        total_paid = getattr(obj, "_total_paid", None) or 0
+        total_due   = getattr(obj, "_total_due",  None) or 0
+        total_paid  = getattr(obj, "_total_paid", None) or 0
         outstanding = total_due - total_paid
 
         if outstanding <= 0:
-            colour = "#16a34a"   # emerald — fully paid
+            colour = "#16a34a"
         elif outstanding == total_due:
-            colour = "#e11d48"   # rose — nothing paid
+            colour = "#e11d48"
         else:
-            colour = "#d97706"   # amber — partially paid
+            colour = "#d97706"
 
         return mark_safe(
             f'<span style="color:{colour};font-weight:600;">'
@@ -391,16 +464,6 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
             return "—"
 
         installments = list(obj.installments.all())
-        if not installments:
-            return "No installments generated yet."
-
-        total_due  = sum(i.amount_due  for i in installments)
-        total_paid = sum(i.amount_paid for i in installments)
-        remaining  = total_due - total_paid
-        n_total    = len(installments)
-        n_paid     = sum(1 for i in installments if i.status == Installment.Status.PAID)
-        n_overdue  = sum(1 for i in installments if i.status == Installment.Status.OVERDUE)
-        n_pending  = sum(1 for i in installments if i.status == Installment.Status.PENDING)
 
         VIOLET  = "#7c3aed"
         EMERALD = "#16a34a"
@@ -409,14 +472,44 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
         ROSE    = "#e11d48"
         SKY     = "#0284c7"
 
-        stats = [
-            ("Total Due",    _pkr(total_due),                    SKY),
-            ("Collected",    _pkr(total_paid),                   EMERALD),
-            ("Remaining",    _pkr(remaining),                    ROSE if remaining > 0 else EMERALD),
-            ("Installments", f"{n_paid} / {n_total} paid",       VIOLET),
-            ("Pending",      n_pending,                          AMBER),
-            ("Overdue",      n_overdue,                          ROSE if n_overdue else EMERALD),
+        # Upfront section
+        token_colour = EMERALD if obj.token_received_on else AMBER
+        dp_colour    = EMERALD if obj.down_payment_received_on else AMBER
+
+        upfront_stats = [
+            ("Token Received",  _pkr(obj.token_amount),  token_colour),
+            ("Down Payment",    _pkr(obj.down_payment),  dp_colour),
+            ("Total Upfront",   _pkr(obj.total_upfront), VIOLET),
+            ("Instalment Principal", _pkr(obj.installment_principal), SKY),
         ]
+
+        if not installments:
+            instalment_note = (
+                '<p style="color:#d97706;font-size:12px;margin:8px 0 0;">'
+                '⚠ Installments not yet generated. '
+                'Change status to Active to trigger generation.</p>'
+                if obj.status == Booking.Status.TOKEN
+                else '<p style="color:#64748b;font-size:12px;margin:8px 0 0;">'
+                     'No installments yet.</p>'
+            )
+        else:
+            total_due  = sum(i.amount_due  for i in installments)
+            total_paid = sum(i.amount_paid for i in installments)
+            remaining  = total_due - total_paid
+            n_total    = len(installments)
+            n_paid     = sum(1 for i in installments if i.status == Installment.Status.PAID)
+            n_overdue  = sum(1 for i in installments if i.status == Installment.Status.OVERDUE)
+            n_pending  = sum(1 for i in installments if i.status == Installment.Status.PENDING)
+
+            instalment_note = ""
+            upfront_stats += [
+                ("Total Due",    _pkr(total_due),                    SKY),
+                ("Collected",    _pkr(total_paid),                   EMERALD),
+                ("Remaining",    _pkr(remaining),                    ROSE if remaining > 0 else EMERALD),
+                ("Instalments",  f"{n_paid} / {n_total} paid",       VIOLET),
+                ("Pending",      n_pending,                          AMBER),
+                ("Overdue",      n_overdue,                          ROSE if n_overdue else EMERALD),
+            ]
 
         cards = "".join(
             f'<div style="display:inline-block;min-width:145px;margin:6px 10px 6px 0;'
@@ -425,16 +518,18 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
             f'<div style="font-size:18px;font-weight:700;color:{colour};">{value}</div>'
             f'<div style="font-size:11px;color:#64748b;margin-top:4px;">{label}</div>'
             f'</div>'
-            for label, value, colour in stats
+            for label, value, colour in upfront_stats
         )
-        return mark_safe(
-            f'<div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 0;">{cards}</div>'
-        )
+
+        html = f'<div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 0;">{cards}</div>'
+        if instalment_note:
+            html += instalment_note
+
+        return mark_safe(html)
 
     # ── Permissions ────────────────────────────────────────────────
 
     def has_delete_permission(self, request, obj=None):
-        # Only superusers can hard-delete; soft delete handles the rest
         return request.user.is_superuser
 
     def delete_model(self, request, obj):
@@ -445,17 +540,19 @@ class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin
             obj.delete()
 
 
+# ─────────────────────────────────────────────
+# BOOKING HISTORY ADMIN
+# ─────────────────────────────────────────────
 
 @admin.register(Booking.history.model)
 class HistoricalBookingAdmin(UnfoldModelAdmin):
-    list_display    = ("id", "customer_id", "status", "history_date", "history_type", "history_user")
-    list_filter     = ("history_type", "status")
-    search_fields   = ("customer__full_name",)
-    ordering        = ("-history_date",)
-    list_per_page   = 40
+    list_display  = ("id", "customer_id", "status", "history_date", "history_type", "history_user")
+    list_filter   = ("history_type", "status")
+    ordering      = ("-history_date",)
+    list_per_page = 40
     readonly_fields = [f.name for f in Booking.history.model._meta.get_fields()]
 
-    def has_add_permission(self, request): return False
+    def has_add_permission(self, request):    return False
     def has_change_permission(self, request, obj=None): return False
     def has_delete_permission(self, request, obj=None): return False
 
@@ -469,12 +566,10 @@ class InstallmentAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryA
     resource_classes    = [InstallmentResource]
     confirmation_fields = ["status"]
 
-    # ── Unfold UI ──────────────────────────────────────────────────
     compressed_fields  = True
     warn_unsaved_form  = True
     list_filter_submit = True
 
-    # ── List view ──────────────────────────────────────────────────
     list_display = (
         "challan_number",
         "booking_link",
@@ -499,8 +594,8 @@ class InstallmentAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryA
     )
     list_filter = (
         "status",
-        ("due_date", DateRangeFilterBuilder(title="Due Date")),
-        ("paid_on",  DateRangeFilterBuilder(title="Paid On")),
+        ("due_date",   DateRangeFilterBuilder(title="Due Date")),
+        ("paid_on",    DateRangeFilterBuilder(title="Paid On")),
         ("created_at", DateRangeFilterBuilder(title="Created")),
     )
     date_hierarchy = "due_date"
@@ -508,7 +603,6 @@ class InstallmentAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryA
     ordering       = ["due_date", "installment_number"]
     actions        = [mark_overdue]
 
-    # ── Change form ────────────────────────────────────────────────
     autocomplete_fields = ["booking"]
     readonly_fields     = ("created_at", "challan_number")
 
@@ -555,7 +649,6 @@ class InstallmentAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryA
             .get_queryset(request)
             .select_related("booking", "booking__customer", "booking__plot")
         )
-    # ── Badges ─────────────────────────────────────────────────────
 
     @display(
         description=_("Status"),
@@ -570,11 +663,8 @@ class InstallmentAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryA
     def status_badge(self, obj):
         return obj.get_status_display()
 
-    # ── List computed columns ──────────────────────────────────────
-
     @display(description=_("Booking"), ordering="booking__id")
     def booking_link(self, obj):
-        from django.urls import reverse
         url = reverse("admin:bookings_booking_change", args=[obj.booking_id])
         return mark_safe(f'<a href="{url}">#{obj.booking_id}</a>')
 
@@ -590,28 +680,24 @@ class InstallmentAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryA
     def amount_paid_display(self, obj):
         colour = "#16a34a" if obj.amount_paid > 0 else "#64748b"
         return mark_safe(
-            f'<span style="color:{colour};font-weight:600;">'
-            f'{_pkr(obj.amount_paid)}</span>'
+            f'<span style="color:{colour};font-weight:600;">{_pkr(obj.amount_paid)}</span>'
         )
 
-    @display(description=_("Balance"), ordering="amount_due")
+    @display(description=_("Balance"))
     def balance_display(self, obj):
         balance = obj.amount_due - obj.amount_paid
         colour  = "#e11d48" if balance > 0 else "#16a34a"
         return mark_safe(
-            f'<span style="color:{colour};font-weight:600;">'
-            f'{_pkr(balance)}</span>'
+            f'<span style="color:{colour};font-weight:600;">{_pkr(balance)}</span>'
         )
+
     @display(description=_("Challan"))
     def challan_link(self, obj):
         url = reverse("challans:pdf", args=[obj.pk])
         return mark_safe(
             f'<a href="{url}" target="_blank" '
-            f'style="color:#7c3aed;font-weight:600;font-size:11px;">'
-            f'↓ PDF</a>'
+            f'style="color:#7c3aed;font-weight:600;font-size:11px;">↓ PDF</a>'
         )
-
-    # ── Soft-delete ────────────────────────────────────────────────
 
     def delete_model(self, request, obj):
         obj.delete()
@@ -620,15 +706,20 @@ class InstallmentAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryA
         for obj in queryset:
             obj.delete()
 
+
+# ─────────────────────────────────────────────
+# INSTALLMENT HISTORY ADMIN
+# ─────────────────────────────────────────────
+
 @admin.register(Installment.history.model)
 class HistoricalInstallmentAdmin(UnfoldModelAdmin):
-    list_display    = ("challan_number", "status", "amount_due", "amount_paid", "history_date", "history_type", "history_user")
-    list_filter     = ("history_type", "status")
-    search_fields   = ("challan_number",)
-    ordering        = ("-history_date",)
-    list_per_page   = 40
+    list_display  = ("challan_number", "status", "amount_due", "amount_paid", "history_date", "history_type", "history_user")
+    list_filter   = ("history_type", "status")
+    search_fields = ("challan_number",)
+    ordering      = ("-history_date",)
+    list_per_page = 40
     readonly_fields = [f.name for f in Installment.history.model._meta.get_fields()]
 
-    def has_add_permission(self, request): return False
+    def has_add_permission(self, request):    return False
     def has_change_permission(self, request, obj=None): return False
     def has_delete_permission(self, request, obj=None): return False
