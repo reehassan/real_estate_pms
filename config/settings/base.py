@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'apps.customers.apps.CustomersConfig',
     'apps.bookings.apps.BookingsConfig',
     'apps.expenses.apps.ExpensesConfig',
+    'apps.reports.apps.ReportsConfig',
     'apps.dashboard',
 ]
 
@@ -346,6 +347,38 @@ UNFOLD = {
                 ],
             },
             {
+                "title": "Reports",
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": "Monthly Payments",
+                        "icon":  "calendar_month",
+                        "link":  "/reports/monthly-collection/",
+                    },
+                    {
+                        "title": "Money In vs Out",
+                        "icon":  "account_balance",
+                        "link":  "/reports/cash-flow/",
+                    },
+                    {
+                        "title": "Pending Activations",
+                        "icon":  "pending_actions",
+                        "link":  "/reports/token-pipeline/",
+                    },
+                    {
+                        "title": "Late Payments",
+                        "icon":  "warning",
+                        "link":  "/reports/overdue-aging/",
+                    },
+                    {
+                        "title": "Sales by Plan Type",
+                        "icon":  "bar_chart",
+                        "link":  "/reports/payment-plan-breakdown/",
+                    },
+                ],
+            },
+            {
                 "title": "Audit & History",
                 "separator": True,
                 "items": [
@@ -353,6 +386,16 @@ UNFOLD = {
                         "title": "User History",
                         "icon":  "manage_history",
                         "link":  reverse_lazy("admin:accounts_historicaluser_changelist"),
+                    },
+                    {
+                        "title": "Project History",
+                        "icon":  "manage_history",
+                        "link":  reverse_lazy("admin:projects_and_plots_historicalproject_changelist"),
+                    },
+                    {
+                        "title": "Plot History",
+                        "icon":  "manage_history",
+                        "link":  reverse_lazy("admin:projects_and_plots_historicalplot_changelist"),
                     },
                     {
                         "title": "Booking History",
@@ -368,6 +411,11 @@ UNFOLD = {
                         "title": "Expense History",
                         "icon":  "manage_history",
                         "link":  reverse_lazy("admin:expenses_historicalexpense_changelist"),
+                    },
+                    {
+                        "title": "Customer History",
+                        "icon":  "manage_history",
+                        "link":  reverse_lazy("admin:customers_historicalcustomer_changelist"),
                     },
                 ],
             },
