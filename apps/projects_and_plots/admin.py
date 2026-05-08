@@ -27,6 +27,10 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import display
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
+from django.urls import reverse
+
+
 
 from .models import Project, Plot
 
@@ -187,7 +191,7 @@ class ProjectAdmin(ImportExportModelAdmin, SimpleHistoryAdmin, ModelAdmin):
         ("updated_at", DateRangeFilterBuilder(title="Last Updated")),
     )
 
-    readonly_fields = ("created_at", "updated_at", "project_financial_summary")
+    readonly_fields = ("created_at", "updated_at", "project_financial_summary", "project_report_links")
     inlines         = [PlotInline]
 
     fieldsets = (
@@ -219,6 +223,14 @@ class ProjectAdmin(ImportExportModelAdmin, SimpleHistoryAdmin, ModelAdmin):
                 "fields": ("project_financial_summary",),
                 "classes": ["wide"],
                 "description": "Aggregated stats from all plots in this project.",
+            },
+        ),
+        (
+            _("Reports"),
+            {
+                "fields": ("project_report_links",),
+                "classes": ["wide"],
+                "description": "Download Excel reports scoped to this project.",
             },
         ),
         (
@@ -318,6 +330,37 @@ class ProjectAdmin(ImportExportModelAdmin, SimpleHistoryAdmin, ModelAdmin):
         return mark_safe(
             f'<div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 0;">{cards}</div>'
         )
+    @display(description=_("Reports"))
+    def project_report_links(self, obj: Project) -> str:
+        """
+        Rendered as a readonly field on the project change form.
+        Each button links to the matching Excel report view.
+        """
+        if not obj.pk:
+            return "Save the project first to generate reports."
+ 
+        BTN = (
+            "display:inline-block;margin:4px 8px 4px 0;"
+            "padding:8px 16px;border-radius:6px;"
+            "font-size:12px;font-weight:600;text-decoration:none;"
+            "color:#fff;background:{bg};"
+        )
+        reports = [
+            (" Plot Inventory",    "reports:project_plot_inventory",   "#0284c7"),
+            (" Revenue",           "reports:project_revenue",          "#16a34a"),
+            (" Expenses",          "reports:project_expenses",         "#7c3aed"),
+            (" Per-Plot Detail",   "reports:project_per_plot_detail",  "#1e293b"),
+        ]
+        links = "".join(
+            f'<a href="{reverse(name, args=[obj.pk])}" target="_blank" '
+            f'style="{BTN.format(bg=colour)}">{label}</a>'
+            for label, name, colour in reports
+        )
+        return mark_safe(
+            f'<div style="padding:8px 0;">{links}</div>'
+            f'<p style="font-size:11px;color:#64748b;margin-top:8px;">'
+            f'Each link downloads an Excel file immediately.</p>'
+        )
 
     # ── Soft-delete ────────────────────────────────────────────────
 
@@ -327,6 +370,20 @@ class ProjectAdmin(ImportExportModelAdmin, SimpleHistoryAdmin, ModelAdmin):
     def delete_queryset(self, request, queryset):
         for obj in queryset:
             obj.delete()
+
+@admin.register(Project.history.model)
+class HistoricalProjectAdmin(UnfoldModelAdmin):
+    list_display  = ("name", "code", "status", "location", "history_date", "history_type", "history_user")
+    list_filter   = ("history_type", "status")
+    search_fields = ("name", "code", "location")
+    ordering      = ("-history_date",)
+    list_per_page = 40
+    readonly_fields = [f.name for f in Project.history.model._meta.get_fields()]
+
+    def has_add_permission(self, request): return False
+    def has_change_permission(self, request, obj=None): return False
+    def has_delete_permission(self, request, obj=None): return False
+
 
 
 # ─────────────────────────────────────────────
@@ -435,3 +492,18 @@ class PlotAdmin(ImportExportModelAdmin, SimpleHistoryAdmin, ModelAdmin):
     def delete_queryset(self, request, queryset):
         for obj in queryset:
             obj.delete()
+
+
+
+@admin.register(Plot.history.model)
+class HistoricalPlotAdmin(UnfoldModelAdmin):
+    list_display  = ("plot_number", "project", "status", "price", "category", "history_date", "history_type", "history_user")
+    list_filter   = ("history_type", "status", "category")
+    search_fields = ("plot_number", "block", "project__name")
+    ordering      = ("-history_date",)
+    list_per_page = 40
+    readonly_fields = [f.name for f in Plot.history.model._meta.get_fields()]
+
+    def has_add_permission(self, request): return False
+    def has_change_permission(self, request, obj=None): return False
+    def has_delete_permission(self, request, obj=None): return False
