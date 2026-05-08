@@ -21,6 +21,8 @@ from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from unfold.admin import TabularInline as UnfoldTabularInline
 from unfold.decorators import display
 from simple_history.admin import SimpleHistoryAdmin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
+
 
 from rangefilter.filters import DateRangeFilterBuilder
 
@@ -231,3 +233,17 @@ class CustomerAdmin(SimpleHistoryAdmin,UnfoldModelAdmin):
     def delete_queryset(self, request, queryset):
         for obj in queryset:
             obj.delete()
+
+
+@admin.register(Customer.history.model)
+class HistoricalCustomerAdmin(UnfoldModelAdmin):
+    list_display  = ("full_name", "cnic", "phone", "customer_type", "history_date", "history_type", "history_user")
+    list_filter   = ("history_type", "customer_type")
+    search_fields = ("full_name", "cnic", "phone")
+    ordering      = ("-history_date",)
+    list_per_page = 40
+    readonly_fields = [f.name for f in Customer.history.model._meta.get_fields()]
+
+    def has_add_permission(self, request): return False
+    def has_change_permission(self, request, obj=None): return False
+    def has_delete_permission(self, request, obj=None): return False

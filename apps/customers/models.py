@@ -20,12 +20,10 @@ cnic_validator = RegexValidator(
     regex=r'^\d{5}-\d{7}-\d{1}$',
     message='Enter a valid CNIC in format XXXXX-XXXXXXX-X.'
 )
-
 phone_validator = RegexValidator(
-    regex=r'^\+?92\d{10}$|^0\d{10}$',
-    message='Enter a valid Pakistani phone number e.g. 03001234567.'
+    regex=r'^\+?92\d{10}$|^03\d{9}$',
+    message='Enter a valid Pakistani phone number e.g. 03001234567 or +923001234567.'
 )
-
 
 # ─────────────────────────────────────────────
 # MANAGERS
