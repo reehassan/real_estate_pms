@@ -257,13 +257,17 @@
             </td>
             <td>{{ b.get_payment_plan_display }}</td>
             <td>
-              {% if b.status == "active" %}
-                <span class="pms-badge" style="background:#16a34a">Active</span>
-              {% elif b.status == "completed" %}
-                <span class="pms-badge" style="background:#2563eb">Completed</span>
-              {% else %}
-                <span class="pms-badge" style="background:#dc2626">Cancelled</span>
-              {% endif %}
+              {% with status=b.get_status_display %}
+                {% if status == "Active" %}
+                  <span class="pms-badge" style="background:#16a34a">Active</span>
+                {% elif status == "Completed" %}
+                  <span class="pms-badge" style="background:#2563eb">Completed</span>
+                {% elif status == "Token" %}
+                  <span class="pms-badge" style="background:#d97706">Token</span>
+                {% else %}
+                  <span class="pms-badge" style="background:#dc2626">{{ status }}</span>
+                {% endif %}
+              {% endwith %}
             </td>
           </tr>
           {% empty %}

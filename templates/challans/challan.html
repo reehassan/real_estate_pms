@@ -2,315 +2,150 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{{ installment.challan_number }}</title>
   <style>
-    /* ── WeasyPrint A4 Page Setup ─────────────────────────── */
-    @page {
-      size: A4;
-      margin: 0;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    @page { size: A4; margin: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 10pt;
-      color: #1E293B;
+      color: #0F172A;
       background: #ffffff;
       width: 210mm;
       min-height: 297mm;
     }
 
-    /* ── Layout ───────────────────────────────────────────── */
-    .page {
-      width: 210mm;
-      min-height: 297mm;
-      display: flex;
-      flex-direction: column;
-    }
+    .page { width: 210mm; min-height: 297mm; display: flex; flex-direction: column; }
 
-    /* ── Header Band — Violet ─────────────────────────────── */
+    /* Header */
     .header {
-      background: #1C1240;
-      color: #ffffff;
-      padding: 28px 36px 24px;
+      background: #0F172A;
+      padding: 28px 36px 22px;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
+      border-bottom: 3pt solid #7C3AED;
     }
 
-    .brand-name {
-      font-size: 20pt;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      color: #ffffff;
-      line-height: 1.1;
+    .brand-initial {
+      width: 36pt; height: 36pt;
+      background: #7C3AED;
+      border-radius: 6pt;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16pt; font-weight: 900; color: #fff;
+      margin-bottom: 8px;
     }
 
-    .brand-tagline {
-      font-size: 7.5pt;
-      font-weight: 400;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.5);
-      margin-top: 4px;
-    }
+    .brand-name { font-size: 14pt; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
+    .brand-tagline { font-size: 6.5pt; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(148,163,184,0.8); margin-top: 2px; }
 
-    .challan-meta {
-      text-align: right;
-    }
+    .challan-meta { text-align: right; }
+    .challan-title { font-size: 13pt; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #C4B5FD; }
+    .challan-number { font-size: 9pt; color: rgba(196,181,253,0.7); margin-top: 6px; font-family: monospace; letter-spacing: 0.1em; }
+    .challan-date { font-size: 8pt; color: rgba(148,163,184,0.6); margin-top: 3px; }
 
-    .challan-title {
-      font-size: 14pt;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #C4B5FD;
-    }
-
-    .challan-number {
-      font-size: 9pt;
-      color: rgba(255,255,255,0.6);
-      margin-top: 5px;
-      font-family: monospace;
-      letter-spacing: 0.08em;
-    }
-
-    .challan-date {
-      font-size: 8.5pt;
-      color: rgba(255,255,255,0.45);
-      margin-top: 3px;
-    }
-
-    /* ── Status Stripe ────────────────────────────────────── */
+    /* Status stripe — class names match uppercase status values directly */
     .status-stripe {
-      padding: 6px 36px;
-      font-size: 7.5pt;
-      font-weight: 700;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      text-align: right;
+      padding: 7px 36px;
+      font-size: 7.5pt; font-weight: 700;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      display: flex; justify-content: flex-end; align-items: center; gap: 8px;
+    }
+    .status-stripe::before {
+      content: ''; display: inline-block;
+      width: 6pt; height: 6pt; border-radius: 50%;
     }
 
-    .status-pending  { background: #FFF3CD; color: #92400E; }
-    .status-paid     { background: #D1FAE5; color: #065F46; }
-    .status-overdue  { background: #FEE2E2; color: #991B1B; }
+    /* UPPERCASE class names to match model status values */
+    .stripe-PENDING  { background: #FFFBEB; color: #92400E; }
+    .stripe-PENDING::before  { background: #D97706; }
+    .stripe-PAID     { background: #F0FDF4; color: #065F46; }
+    .stripe-PAID::before     { background: #16A34A; }
+    .stripe-OVERDUE  { background: #FEF2F2; color: #991B1B; }
+    .stripe-OVERDUE::before  { background: #DC2626; }
+    .stripe-WAIVED   { background: #F8FAFC; color: #64748B; }
+    .stripe-WAIVED::before   { background: #94A3B8; }
 
-    /* ── Body ─────────────────────────────────────────────── */
-    .body {
-      flex: 1;
-      padding: 28px 36px;
-    }
+    /* Body */
+    .body { flex: 1; padding: 24px 36px; background: #F8FAFC; }
 
-    /* ── Section Cards ────────────────────────────────────── */
-    .section {
-      margin-bottom: 18px;
-      border: 0.75pt solid #E2E8F0;
-      border-radius: 4pt;
-      overflow: hidden;
-    }
+    .section { margin-bottom: 14px; background: #fff; border: 0.75pt solid #E2E8F0; border-radius: 6pt; overflow: hidden; }
 
     .section-header {
-      background: #F1F5F9;
-      padding: 6px 14px;
-      font-size: 7.5pt;
-      font-weight: 700;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: #64748B;
-      border-bottom: 0.75pt solid #E2E8F0;
+      background: #F1F5F9; padding: 5px 14px;
+      font-size: 7pt; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+      color: #64748B; border-bottom: 0.75pt solid #E2E8F0;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .section-header::before {
+      content: ''; display: inline-block;
+      width: 3pt; height: 12pt; background: #7C3AED; border-radius: 2pt;
     }
 
-    .section-body {
-      padding: 12px 14px;
-    }
+    .section-body { padding: 14px; }
 
-    /* ── Grid layout inside sections ─────────────────────── */
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px 24px;
-    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 28px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px 20px; }
 
-    .grid-3 {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px 24px;
-    }
+    .field-label { font-size: 6.5pt; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #94A3B8; margin-bottom: 2px; }
+    .field-value { font-size: 10pt; font-weight: 500; color: #0F172A; line-height: 1.3; }
+    .field-value.mono { font-family: monospace; font-size: 9.5pt; letter-spacing: 0.04em; }
 
-    .field-label {
-      font-size: 7pt;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #94A3B8;
-      margin-bottom: 2px;
-    }
+    /* Finance table */
+    .finance-table { width: 100%; border-collapse: collapse; }
+    .finance-table tr td { padding: 7px 0; border-bottom: 0.5pt solid #F1F5F9; font-size: 9.5pt; vertical-align: middle; }
+    .finance-table tr:last-child td { border-bottom: none; }
+    .finance-table td.label { color: #64748B; width: 58%; }
+    .finance-table td.amount { font-family: monospace; font-weight: 600; text-align: right; color: #0F172A; }
+    .finance-table tr.highlight td { padding-top: 10px; font-size: 11.5pt; font-weight: 700; border-top: 1.5pt solid #DDD6FE; }
+    .finance-table tr.highlight td.label { color: #5B21B6; }
+    .finance-table tr.highlight td.amount { color: #7C3AED; }
 
-    .field-value {
-      font-size: 10pt;
-      font-weight: 500;
-      color: #1E293B;
-      line-height: 1.3;
-    }
+    /* Progress */
+    .progress-wrap { margin-top: 12px; padding-top: 12px; border-top: 0.5pt solid #F1F5F9; }
+    .progress-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    .progress-label { font-size: 7pt; color: #94A3B8; letter-spacing: 0.1em; text-transform: uppercase; }
+    .progress-count { font-size: 7pt; color: #7C3AED; font-weight: 700; font-family: monospace; }
+    .progress-bar { height: 5pt; background: #EDE9FE; border-radius: 99pt; overflow: hidden; }
+    .progress-fill { height: 100%; background: #7C3AED; border-radius: 99pt; }
 
-    .field-value.mono {
-      font-family: monospace;
-      font-size: 10.5pt;
-    }
+    /* Footer */
+    .footer { background: #0F172A; padding: 16px 36px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .footer-address { font-size: 7.5pt; color: rgba(148,163,184,0.7); line-height: 1.7; max-width: 55%; }
+    .footer-address strong { color: #C4B5FD; font-size: 8pt; font-weight: 600; display: block; margin-bottom: 2px; letter-spacing: 0.06em; }
+    .signature-box { text-align: center; width: 110pt; }
+    .signature-line { border-top: 0.75pt solid rgba(100,116,139,0.4); width: 100%; margin-bottom: 5px; }
+    .signature-label { font-size: 6.5pt; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(148,163,184,0.6); }
 
-    /* ── Financial Summary Table ──────────────────────────── */
-    .finance-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 2px;
-    }
-
-    .finance-table tr td {
-      padding: 7px 0;
-      border-bottom: 0.5pt solid #F1F5F9;
-      font-size: 9.5pt;
-    }
-
-    .finance-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .finance-table td.label {
-      color: #64748B;
-      width: 55%;
-    }
-
-    .finance-table td.amount {
-      font-family: monospace;
-      font-weight: 600;
-      text-align: right;
-      color: #1E293B;
-    }
-
-    .finance-table tr.highlight td {
-      padding-top: 10px;
-      font-size: 11pt;
-      font-weight: 700;
-      color: #1C1240;
-      border-top: 1pt solid #C7D2FE;
-    }
-
-    .finance-table tr.highlight td.amount {
-      color: #1C1240;
-    }
-
-    /* ── Installment Progress Bar ─────────────────────────── */
-    .progress-wrap {
-      margin-top: 10px;
-    }
-
-    .progress-label {
-      font-size: 7.5pt;
-      color: #94A3B8;
-      margin-bottom: 4px;
-      letter-spacing: 0.08em;
-    }
-
-    .progress-bar {
-      height: 5pt;
-      background: #E2E8F0;
-      border-radius: 99pt;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: #1C1240;
-      border-radius: 99pt;
-    }
-
-    .progress-text {
-      font-size: 7.5pt;
-      color: #64748B;
-      margin-top: 3px;
-      text-align: right;
-    }
-
-    /* ── Footer ───────────────────────────────────────────── */
-    .footer {
-      border-top: 0.75pt solid #E2E8F0;
-      padding: 16px 36px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-    }
-
-    .footer-address {
-      font-size: 7.5pt;
-      color: #94A3B8;
-      line-height: 1.6;
-      max-width: 55%;
-    }
-
-    .footer-address strong {
-      color: #64748B;
-      font-size: 8pt;
-      display: block;
-      margin-bottom: 2px;
-    }
-
-    .signature-box {
-      text-align: center;
-      width: 120pt;
-    }
-
-    .signature-line {
-      border-top: 0.75pt solid #CBD5E1;
-      width: 100%;
-      margin-bottom: 4px;
-    }
-
-    .signature-label {
-      font-size: 7pt;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #94A3B8;
-    }
-
-    /* ── Watermark for PAID ───────────────────────────────── */
+    /* Watermark */
     .watermark {
-      position: fixed;
-      top: 50%;
-      left: 50%;
+      position: fixed; top: 50%; left: 50%;
       transform: translate(-50%, -50%) rotate(-30deg);
-      font-size: 72pt;
-      font-weight: 900;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(34, 197, 94, 0.07);
-      pointer-events: none;
-      z-index: 0;
-      white-space: nowrap;
+      font-size: 72pt; font-weight: 900; letter-spacing: 0.08em;
+      text-transform: uppercase; pointer-events: none; z-index: 0; white-space: nowrap;
     }
-
-    /* ── Print utility ────────────────────────────────────── */
-    @media print {
-      .page { page-break-after: always; }
-    }
+    .wm-paid    { color: rgba(22, 163, 74, 0.06); }
+    .wm-overdue { color: rgba(220, 38, 38, 0.05); }
+    .wm-waived  { color: rgba(124, 58, 237, 0.05); }
   </style>
 </head>
 <body>
 
-{% if installment.status == 'paid' %}
-<div class="watermark">PAID</div>
+{# Watermark — compare against uppercase status values #}
+{% if installment.status == 'PAID' %}
+  <div class="watermark wm-paid">PAID</div>
+{% elif installment.status == 'OVERDUE' %}
+  <div class="watermark wm-overdue">OVERDUE</div>
+{% elif installment.status == 'WAIVED' %}
+  <div class="watermark wm-waived">WAIVED</div>
 {% endif %}
 
 <div class="page">
 
-  {# ── HEADER ── #}
   <div class="header">
     <div>
+      <div class="brand-initial">R</div>
       <div class="brand-name">Royal Land</div>
       <div class="brand-tagline">Developers &amp; Real Estate</div>
     </div>
@@ -321,20 +156,20 @@
     </div>
   </div>
 
-  {# ── STATUS STRIPE ── #}
-  <div class="status-stripe status-{{ installment.status }}">
+  {# Status stripe — stripe-PAID, stripe-PENDING etc. match uppercase #}
+  <div class="status-stripe stripe-{{ installment.status }}">
     {{ installment.get_status_display }}
-    {% if installment.status == 'paid' %}
+    {% if installment.status == 'PAID' %}
       &nbsp;·&nbsp; Paid on {{ installment.paid_on|date:"d M Y" }}
-    {% elif installment.status == 'overdue' %}
-      &nbsp;·&nbsp; Overdue since {{ installment.due_date|date:"d M Y" }}
+    {% elif installment.status == 'OVERDUE' %}
+      &nbsp;·&nbsp; Was due {{ installment.due_date|date:"d M Y" }}
+    {% else %}
+      &nbsp;·&nbsp; Due {{ installment.due_date|date:"d M Y" }}
     {% endif %}
   </div>
 
-  {# ── BODY ── #}
   <div class="body">
 
-    {# ── CUSTOMER DETAILS ── #}
     <div class="section">
       <div class="section-header">Customer Details</div>
       <div class="section-body">
@@ -359,7 +194,6 @@
       </div>
     </div>
 
-    {# ── PROPERTY DETAILS ── #}
     <div class="section">
       <div class="section-header">Property Details</div>
       <div class="section-body">
@@ -392,7 +226,6 @@
       </div>
     </div>
 
-    {# ── PAYMENT DETAILS ── #}
     <div class="section">
       <div class="section-header">Payment Details</div>
       <div class="section-body">
@@ -401,6 +234,12 @@
             <td class="label">Total Plot Price</td>
             <td class="amount">PKR {{ booking.total_price|floatformat:0 }}</td>
           </tr>
+          {% if booking.token_amount %}
+          <tr>
+            <td class="label">Token Amount</td>
+            <td class="amount">PKR {{ booking.token_amount|floatformat:0 }}</td>
+          </tr>
+          {% endif %}
           <tr>
             <td class="label">Down Payment</td>
             <td class="amount">PKR {{ booking.down_payment|floatformat:0 }}</td>
@@ -410,14 +249,14 @@
             <td class="amount">{{ booking.get_payment_plan_display }}</td>
           </tr>
           <tr>
-            <td class="label">Installment Number</td>
+            <td class="label">Installment</td>
             <td class="amount">{{ installment.installment_number }} of {{ total_installments }}</td>
           </tr>
           <tr>
             <td class="label">Due Date</td>
             <td class="amount">{{ installment.due_date|date:"d M Y" }}</td>
           </tr>
-          {% if installment.status == 'paid' %}
+          {% if installment.status == 'PAID' %}
           <tr>
             <td class="label">Amount Paid</td>
             <td class="amount">PKR {{ installment.amount_paid|floatformat:0 }}</td>
@@ -429,31 +268,27 @@
           </tr>
         </table>
 
-        {# ── Progress bar ── #}
         <div class="progress-wrap">
-          <div class="progress-label">Installment Progress</div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: {% widthratio installment.installment_number total_installments 100 %}%;"></div>
+          <div class="progress-header">
+            <div class="progress-label">Installment Progress</div>
+            <div class="progress-count">{{ installment.installment_number }} / {{ total_installments }}</div>
           </div>
-          <div class="progress-text">
-            Installment {{ installment.installment_number }} of {{ total_installments }}
+          <div class="progress-bar">
+            <div class="progress-fill"
+                 style="width: {% widthratio installment.installment_number total_installments 100 %}%;">
+            </div>
           </div>
         </div>
 
       </div>
     </div>
 
-  </div>{# /body #}
+  </div>
 
-  {# ── FOOTER ── #}
   <div class="footer">
     <div class="footer-address">
       <strong>Royal Land Developers</strong>
-      {% if project.address %}
-        {{ project.address }}
-      {% else %}
-        Contact your sales agent for office address.
-      {% endif %}
+      {% if project.address %}{{ project.address }}{% else %}Contact your sales representative for office address.{% endif %}
     </div>
     <div class="signature-box">
       <div class="signature-line"></div>
@@ -461,7 +296,6 @@
     </div>
   </div>
 
-</div>{# /page #}
-
+</div>
 </body>
 </html>
