@@ -21,6 +21,8 @@ from apps.bookings.models import Booking, Installment
 from apps.customers.models import Customer
 from apps.expenses.models import Expense
 from apps.projects_and_plots.models import Plot, Project
+from apps.bookings.models import Booking, Installment
+
 
 
 # ──────────────────────────────────────────────────────────────
@@ -52,19 +54,19 @@ def dashboard_callback(request, context: dict) -> dict:
     # ── KPI Row 1: Money ──────────────────────────────────────
     total_collected = (
         Installment.objects
-        .filter(status="paid")
+        .filter(status=Installment.Status.PAID)
         .aggregate(t=Sum("amount_paid"))["t"] or 0
     )
 
     outstanding = (
         Installment.objects
-        .filter(status__in=["pending", "overdue"])
+        .filter(status__in=[Installment.Status.PENDING, Installment.Status.OVERDUE])
         .aggregate(t=Sum(F("amount_due") - F("amount_paid")))["t"] or 0
     )
 
     this_month_collected = (
         Installment.objects
-        .filter(status="paid", paid_on__year=today.year, paid_on__month=today.month)
+        .filter(status=Installment.Status.PAID, paid_on__year=today.year, paid_on__month=today.month)
         .aggregate(t=Sum("amount_paid"))["t"] or 0
     )
 
@@ -75,7 +77,7 @@ def dashboard_callback(request, context: dict) -> dict:
     )
 
     # ── KPI Row 2: Operations ─────────────────────────────────
-    active_bookings = Booking.objects.filter(status="active").count()
+    active_bookings = Booking.objects.filter(status=Booking.Status.ACTIVE).count()
 
     plot_counts = Plot.objects.values("status").annotate(n=Count("id"))
     plot_map    = {p["status"]: p["n"] for p in plot_counts}
@@ -83,7 +85,7 @@ def dashboard_callback(request, context: dict) -> dict:
     booked_plots    = plot_map.get("BOOKED", 0) + plot_map.get("SOLD", 0)
     total_plots     = sum(plot_map.values())
 
-    overdue_qs     = Installment.objects.filter(status="overdue")
+    overdue_qs     = Installment.objects.filter(status=Installment.Status.OVERDUE)
     overdue_count  = overdue_qs.count()
     overdue_amount = (
         overdue_qs
@@ -92,7 +94,7 @@ def dashboard_callback(request, context: dict) -> dict:
 
     due_in_7 = (
         Installment.objects
-        .filter(status="pending", due_date__gte=today, due_date__lte=today + timedelta(days=7))
+        .filter(status=Installment.Status.PENDING, due_date__gte=today, due_date__lte=today + timedelta(days=7))
         .count()
     )
 
@@ -109,7 +111,7 @@ def dashboard_callback(request, context: dict) -> dict:
     # ── Revenue vs Expense chart (last 12 months) ─────────────
     raw_revenue = dict(
         Installment.objects
-        .filter(status="paid", paid_on__isnull=False, paid_on__gte=months[0])
+        .filter(status=Installment.Status.PAID, paid_on__isnull=False, paid_on__gte=months[0])
         .annotate(month=TruncMonth("paid_on"))
         .values("month")
         .annotate(t=Sum("amount_paid"))
@@ -155,7 +157,7 @@ def dashboard_callback(request, context: dict) -> dict:
     # ── Overdue installments table ────────────────────────────
     overdue_list = (
         Installment.objects
-        .filter(status="overdue")
+        .filter(status=Installment.Status.OVERDUE)
         .select_related("booking__customer", "booking__plot", "booking__plot__project")
         .order_by("due_date")[:8]
     )
@@ -163,7 +165,7 @@ def dashboard_callback(request, context: dict) -> dict:
     # ── Upcoming (next 7 days) ────────────────────────────────
     upcoming_list = (
         Installment.objects
-        .filter(status="pending", due_date__gte=today, due_date__lte=today + timedelta(days=7))
+        .filter(status=Installment.Status.PENDING, due_date__gte=today, due_date__lte=today + timedelta(days=7))
         .select_related("booking__customer", "booking__plot")
         .order_by("due_date")[:8]
     )
