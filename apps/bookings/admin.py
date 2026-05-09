@@ -24,7 +24,6 @@ from django.utils.translation import gettext_lazy as _
 from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
 from rangefilter.filters import DateRangeFilterBuilder
-from admin_confirm import AdminConfirmMixin
 from simple_history.admin import SimpleHistoryAdmin
 
 from unfold.admin import ModelAdmin as UnfoldModelAdmin
@@ -213,8 +212,9 @@ def mark_overdue(modeladmin, request, queryset):
 # ─────────────────────────────────────────────
 
 @admin.register(Booking)
-class BookingAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin, UnfoldModelAdmin):
-    resource_classes    = [BookingResource]
+
+class BookingAdmin(ImportExportModelAdmin, SimpleHistoryAdmin, UnfoldModelAdmin):
+    resource_classes = [BookingResource]
     confirmation_fields = ["status"]
 
     compressed_fields  = True
@@ -562,7 +562,7 @@ class HistoricalBookingAdmin(UnfoldModelAdmin):
 # ─────────────────────────────────────────────
 
 @admin.register(Installment)
-class InstallmentAdmin(AdminConfirmMixin, ImportExportModelAdmin, SimpleHistoryAdmin, UnfoldModelAdmin):
+class InstallmentAdmin(ImportExportModelAdmin, SimpleHistoryAdmin, UnfoldModelAdmin):
     resource_classes    = [InstallmentResource]
     confirmation_fields = ["status"]
 
