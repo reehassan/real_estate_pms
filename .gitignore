@@ -81,4 +81,4 @@ MANIFEST
 # Docker 
 # =============================================
 *.docker
-.dockerignore
+.dockerignorestaticfiles/
