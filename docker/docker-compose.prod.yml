@@ -1,0 +1,86 @@
+# =============================================================================
+# docker-compose.prod.yml — Royal Land PMS  (Production)
+# =============================================================================
+# Services:
+#   db     — PostgreSQL 16
+#   app    — Django + Gunicorn (2 workers, gthread)
+#   nginx  — HTTPS termination, static/media serving, reverse proxy
+#
+# Usage (on Hetzner server):
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml exec app python manage.py createsuperuser
+#   docker compose -f docker-compose.prod.yml logs -f app
+#   docker compose -f docker-compose.prod.yml down          # keep volumes
+#   docker compose -f docker-compose.prod.yml down -v       # wipe everything
+#
+# Required env vars in docker/.env.prod (NEVER commit this file):
+#   SECRET_KEY, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST=db, DB_PORT=5432
+#   ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
+# =============================================================================
+
+services:
+
+  # ── PostgreSQL 16 ───────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      POSTGRES_DB:       ${DB_NAME}
+      POSTGRES_USER:     ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No port exposure — only reachable inside Docker network
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Django + Gunicorn ───────────────────────────────────────────────────────
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.prod
+    image: royal-land-pms:prod
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DB_HOST: db
+      DB_PORT: "5432"
+    volumes:
+      # Named volumes shared with nginx — app writes, nginx reads
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Nginx ───────────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      # SSL certificates — populated by Certbot / copied in CI deploy step
+      - ./certs:/etc/nginx/certs:ro
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media:ro
+    depends_on:
+      - app
+
+# ── Named volumes ─────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
