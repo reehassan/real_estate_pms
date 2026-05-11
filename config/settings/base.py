@@ -295,6 +295,11 @@ UNFOLD = {
                         "icon":  "manage_accounts",
                         "link":  reverse_lazy("admin:accounts_user_changelist"),
                     },
+                    {
+                        "title": "Permission Groups",
+                        "icon":  "group",
+                        "link":  reverse_lazy("admin:auth_group_changelist"),
+                    },
                 ],
             },
             {
