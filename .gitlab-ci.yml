@@ -52,6 +52,16 @@ test:
     policy: pull-push                # download cache at start, upload if changed
 
   before_script:
+    - apt-get update && apt-get install -y --no-install-recommends
+        libpango-1.0-0
+        libpangoft2-1.0-0
+        libpangocairo-1.0-0
+        libglib2.0-0
+        libgdk-pixbuf-2.0-0
+        libgobject-2.0-0
+        shared-mime-info
+        fonts-liberation
+        fonts-dejavu-core
     - pip install --upgrade pip
     - pip install -r requirements.dev.txt
 
