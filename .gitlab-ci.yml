@@ -1,0 +1,169 @@
+# =============================================================================
+# .gitlab-ci.yml — Royal Land PMS
+#
+# Stages:
+#   test   → full 256-test suite against PostgreSQL 16
+#   deploy → SSH deploy with health check + auto rollback on failure
+#
+# GitLab CI/CD Variables (Settings → CI/CD → Variables):
+#   SSH_PRIVATE_KEY  — contents of ~/.ssh/id_rsa on local machine (protected, masked)
+#   VPS_HOST         — Oracle VPS IP                              (protected)
+#   VPS_USER         — ubuntu                                     (protected)
+# =============================================================================
+
+stages:
+  - test
+  - deploy
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STAGE 1 — TEST
+# ─────────────────────────────────────────────────────────────────────────────
+test:
+  stage: test
+  image: python:3.13-slim
+
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+
+  variables:
+    POSTGRES_DB:                test_db
+    POSTGRES_USER:              test_user
+    POSTGRES_PASSWORD:          test_pass
+    POSTGRES_HOST_AUTH_METHOD:  trust
+    DJANGO_SETTINGS_MODULE:     config.settings.development
+    SECRET_KEY:                 ci-test-secret-key-not-used-in-prod
+    DB_NAME:                    test_db
+    DB_USER:                    test_user
+    DB_PASSWORD:                test_pass
+    DB_HOST:                    postgres
+    DB_PORT:                    "5432"
+    PIP_CACHE_DIR:              "$CI_PROJECT_DIR/.cache/pip"
+
+  # ── Cache keyed on requirements.dev.txt hash ──────────────────────────────
+  # pip install only re-runs when requirements.dev.txt actually changes.
+  # Same file = cache hit = ~2 minutes saved per pipeline.
+  cache:
+    key:
+      files:
+        - requirements.dev.txt       # cache busts only when this file changes
+    paths:
+      - .cache/pip
+    policy: pull-push                # download cache at start, upload if changed
+
+  before_script:
+    - pip install --upgrade pip
+    - pip install -r requirements.dev.txt
+
+  script:
+    - python manage.py test --verbosity=2
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STAGE 2 — DEPLOY
+# Flow:
+#   1. Tag current running image as :previous  (rollback target)
+#   2. git pull + docker compose up --build    (deploy new)
+#   3. Health check — curl /admin/login/
+#   4. If health check fails → restore :previous image → restart
+#   5. Pipeline fails so GitLab marks the deploy red
+# ─────────────────────────────────────────────────────────────────────────────
+deploy:
+  stage: deploy
+  image: alpine:latest
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - when: never
+
+  environment:
+    name: production
+    url: http://$VPS_HOST:8080/admin
+
+  before_script:
+    - apk add --no-cache openssh-client bash curl
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+  script:
+    - |
+      ssh "$VPS_USER@$VPS_HOST" bash << 'DEPLOY'
+        set -e
+
+        APP_DIR="/opt/royal-land"
+        COMPOSE="docker compose -f $APP_DIR/docker/docker-compose.prod.yml"
+        APP_CONTAINER="docker-app-1"
+        IMAGE="royal-land-pms:prod"
+        HEALTH_URL="http://localhost:8080/admin/login/"
+
+        # ── 1. Tag current image as :previous (rollback target) ───────────────
+        echo "==> [1/5] Saving current image as rollback target..."
+        if docker image inspect "$IMAGE" > /dev/null 2>&1; then
+          docker tag "$IMAGE" "royal-land-pms:previous"
+          echo "    Saved royal-land-pms:previous"
+        else
+          echo "    No existing image found — first deploy, skipping."
+        fi
+
+        # ── 2. Pull latest code ───────────────────────────────────────────────
+        echo "==> [2/5] Pulling latest code..."
+        cd "$APP_DIR"
+        git pull origin main
+
+        # ── 3. Build and deploy ───────────────────────────────────────────────
+        echo "==> [3/5] Building and starting containers..."
+        cd "$APP_DIR/docker"
+        $COMPOSE up -d --build
+
+        # ── 4. Migrate + collectstatic ────────────────────────────────────────
+        echo "==> [4/5] Running migrate and collectstatic..."
+        sleep 10   # give gunicorn time to start
+        docker exec "$APP_CONTAINER" python manage.py migrate --noinput
+        docker exec "$APP_CONTAINER" python manage.py collectstatic --noinput --clear
+
+        # ── 5. Health check ───────────────────────────────────────────────────
+        echo "==> [5/5] Health check: $HEALTH_URL"
+
+        MAX_RETRIES=5
+        RETRY_DELAY=5
+        ATTEMPT=0
+
+        until curl --silent --fail --max-time 10 "$HEALTH_URL" > /dev/null; do
+          ATTEMPT=$((ATTEMPT + 1))
+          if [ "$ATTEMPT" -ge "$MAX_RETRIES" ]; then
+            echo ""
+            echo "HEALTH CHECK FAILED after $MAX_RETRIES attempts."
+            echo "Rolling back to previous image..."
+
+            # ── Rollback ──────────────────────────────────────────────────────
+            if docker image inspect "royal-land-pms:previous" > /dev/null 2>&1; then
+              docker tag "royal-land-pms:previous" "$IMAGE"
+              $COMPOSE up -d     # restart with previous image (no --build)
+              sleep 10
+              echo "Rollback complete. Previous version is live."
+
+              # Verify rollback worked
+              if curl --silent --fail --max-time 10 "$HEALTH_URL" > /dev/null; then
+                echo "Rollback health check PASSED — old version is running."
+              else
+                echo "Rollback health check also FAILED — manual intervention needed."
+              fi
+            else
+              echo "No previous image found — cannot rollback automatically."
+            fi
+
+            exit 1   # mark pipeline as failed regardless
+          fi
+
+          echo "    Attempt $ATTEMPT/$MAX_RETRIES failed. Retrying in ${RETRY_DELAY}s..."
+          sleep "$RETRY_DELAY"
+        done
+
+        echo ""
+        echo "Health check PASSED."
+        echo "==> Deploy complete."
+        echo ""
+        docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+      DEPLOY
