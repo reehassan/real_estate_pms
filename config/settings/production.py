@@ -70,12 +70,6 @@ EMAIL_HOST_USER     = config('EMAIL_HOST_USER',    default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL  = config('DEFAULT_FROM_EMAIL',  default='noreply@royalland.pk')
 
-# ── Remove debug-only apps ────────────────────────────────────────────────────
-INSTALLED_APPS = [app for app in INSTALLED_APPS if app not in (
-    'debug_toolbar',
-)]
-
-MIDDLEWARE = [m for m in MIDDLEWARE if 'debug_toolbar' not in m]
 
 # ── Logging — structured stdout for Docker / Hetzner ─────────────────────────
 LOGGING = {
