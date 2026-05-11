@@ -6,9 +6,9 @@
 #   deploy → SSH deploy with health check + auto rollback on failure
 #
 # GitLab CI/CD Variables (Settings → CI/CD → Variables):
-#   SSH_PRIVATE_KEY  — contents of ~/.ssh/id_rsa on local machine (protected, masked)
-#   VPS_HOST         — Oracle VPS IP                              (protected)
-#   VPS_USER         — ubuntu                                     (protected)
+#   SSH_PRIVATE_KEY  — type: FILE, contents of ~/.ssh/id_rsa  (protected)
+#   VPS_HOST         — type: Variable, Oracle VPS IP           (protected)
+#   VPS_USER         — type: Variable, ubuntu                  (protected)
 # =============================================================================
 
 stages:
@@ -40,25 +40,22 @@ test:
     DB_PORT:                    "5432"
     PIP_CACHE_DIR:              "$CI_PROJECT_DIR/.cache/pip"
 
-  # ── Cache keyed on requirements.dev.txt hash ──────────────────────────────
-  # pip install only re-runs when requirements.dev.txt actually changes.
-  # Same file = cache hit = ~2 minutes saved per pipeline.
   cache:
     key:
       files:
-        - requirements.dev.txt       # cache busts only when this file changes
+        - requirements.dev.txt
     paths:
       - .cache/pip
-    policy: pull-push                # download cache at start, upload if changed
+    policy: pull-push
 
   before_script:
+    # WeasyPrint system dependencies
     - apt-get update && apt-get install -y --no-install-recommends
         libpango-1.0-0
         libpangoft2-1.0-0
         libpangocairo-1.0-0
         libglib2.0-0
         libgdk-pixbuf-2.0-0
-        libgobject-2.0-0
         shared-mime-info
         fonts-liberation
         fonts-dejavu-core
@@ -70,12 +67,6 @@ test:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STAGE 2 — DEPLOY
-# Flow:
-#   1. Tag current running image as :previous  (rollback target)
-#   2. git pull + docker compose up --build    (deploy new)
-#   3. Health check — curl /admin/login/
-#   4. If health check fails → restore :previous image → restart
-#   5. Pipeline fails so GitLab marks the deploy red
 # ─────────────────────────────────────────────────────────────────────────────
 deploy:
   stage: deploy
@@ -93,7 +84,10 @@ deploy:
   before_script:
     - apk add --no-cache openssh-client bash curl
     - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    # SSH_PRIVATE_KEY is type FILE — GitLab writes it to a temp path
+    # chmod 400 is required, ssh-add rejects world-readable keys
+    - chmod 400 "$SSH_PRIVATE_KEY"
+    - ssh-add "$SSH_PRIVATE_KEY"
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
@@ -129,7 +123,7 @@ deploy:
 
         # ── 4. Migrate + collectstatic ────────────────────────────────────────
         echo "==> [4/5] Running migrate and collectstatic..."
-        sleep 10   # give gunicorn time to start
+        sleep 10
         docker exec "$APP_CONTAINER" python manage.py migrate --noinput
         docker exec "$APP_CONTAINER" python manage.py collectstatic --noinput --clear
 
@@ -147,14 +141,12 @@ deploy:
             echo "HEALTH CHECK FAILED after $MAX_RETRIES attempts."
             echo "Rolling back to previous image..."
 
-            # ── Rollback ──────────────────────────────────────────────────────
             if docker image inspect "royal-land-pms:previous" > /dev/null 2>&1; then
               docker tag "royal-land-pms:previous" "$IMAGE"
-              $COMPOSE up -d     # restart with previous image (no --build)
+              $COMPOSE up -d
               sleep 10
               echo "Rollback complete. Previous version is live."
 
-              # Verify rollback worked
               if curl --silent --fail --max-time 10 "$HEALTH_URL" > /dev/null; then
                 echo "Rollback health check PASSED — old version is running."
               else
@@ -164,7 +156,7 @@ deploy:
               echo "No previous image found — cannot rollback automatically."
             fi
 
-            exit 1   # mark pipeline as failed regardless
+            exit 1
           fi
 
           echo "    Attempt $ATTEMPT/$MAX_RETRIES failed. Retrying in ${RETRY_DELAY}s..."
