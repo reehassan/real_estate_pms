@@ -623,6 +623,7 @@ class InstallmentAdmin(ImportExportModelAdmin, SimpleHistoryAdmin, UnfoldModelAd
                 "fields": (
                     ("due_date", "paid_on"),
                     ("amount_due", "amount_paid"),
+                    "receipt",
                 ),
                 "classes": ["wide"],
             },

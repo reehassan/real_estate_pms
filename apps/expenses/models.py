@@ -33,17 +33,37 @@ class SoftDeleteManager(models.Manager):
 class Expense(models.Model):
 
     class Category(models.TextChoices):
-        CONSTRUCTION  = 'construction',  'Construction'
-        MARKETING     = 'marketing',     'Marketing'
-        SALARIES      = 'salaries',      'Staff Salaries'
-        UTILITIES     = 'utilities',     'Utilities'
-        LEGAL         = 'legal',         'Legal'
-        MISCELLANEOUS = 'miscellaneous', 'Miscellaneous'
+        # ── Tier 1 — happens on every project, every month ────────
+        CONSTRUCTION     = 'construction',     'Construction'
+        DAILY_LABOUR     = 'daily_labour',     'Daily Labour'
+        SALARIES         = 'salaries',         'Staff Salaries'
+        TRANSPORTATION   = 'transportation',   'Transportation & Fuel'
+
+        # ── Tier 2 — happens frequently ───────────────────────────
+        GOVERNMENT_FEES  = 'government_fees',  'Government Fees & NOC'
+        COMMISSION       = 'commission',       'Agent Commission'
+        MARKETING        = 'marketing',        'Marketing & Advertising'
+        UTILITIES        = 'utilities',        'Utilities'
+
+        # ── Tier 3 — happens occasionally ─────────────────────────
+        EQUIPMENT_RENTAL = 'equipment_rental', 'Equipment Rental'
+        MAINTENANCE      = 'maintenance',      'Maintenance & Repair'
+        OFFICE_SUPPLIES  = 'office_supplies',  'Office Supplies'
+        FOOD             = 'food',             'Food'
+        RENT             = 'rent',             'Office / Site Rent'
+        SECURITY         = 'security',         'Security'
+        LEGAL            = 'legal',            'Legal & Documentation'
+
+        # ── Tier 4 — rare but needs tracking ──────────────────────
+        INSURANCE        = 'insurance',        'Insurance'
+        TAXES            = 'taxes',            'Taxes & Duties'
+        MISCELLANEOUS    = 'miscellaneous',    'Miscellaneous'
 
     class PaymentMethod(models.TextChoices):
         CASH     = 'cash',     'Cash'
         TRANSFER = 'transfer', 'Bank Transfer'
         CHEQUE   = 'cheque',   'Cheque'
+        ONLINE   = 'online',   'Online'
 
     # RELATIONS
     project      = models.ForeignKey(

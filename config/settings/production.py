@@ -28,22 +28,28 @@ CSRF_TRUSTED_ORIGINS = [
 # ── HTTPS / Security headers ──────────────────────────────────────────────────
 # Django sets these HTTP response headers when running behind Nginx TLS.
 # Nginx already sends HSTS — Django's setting also guards direct Gunicorn access.
-SECURE_SSL_REDIRECT              = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+# ── HTTPS / Security headers ──────────────────────────────────────────────────
+# All SSL-related settings default to False until SSL is configured.
+# When SSL is ready: set these in .env.prod to True
+SECURE_SSL_REDIRECT              = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
 SECURE_PROXY_SSL_HEADER          = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-SESSION_COOKIE_SECURE            = config('SESSION_COOKIE_SECURE', default=True, cast=bool)
+SESSION_COOKIE_SECURE            = config('SESSION_COOKIE_SECURE', default=False, cast=bool)
 SESSION_COOKIE_HTTPONLY          = True
 SESSION_COOKIE_SAMESITE          = 'Lax'
 
-CSRF_COOKIE_SECURE               = config('CSRF_COOKIE_SECURE', default=True, cast=bool)
+CSRF_COOKIE_SECURE               = config('CSRF_COOKIE_SECURE', default=False, cast=bool)
 CSRF_COOKIE_HTTPONLY             = True
 CSRF_COOKIE_SAMESITE             = 'Lax'
 
-SECURE_HSTS_SECONDS              = 31536000   # 1 year
-SECURE_HSTS_INCLUDE_SUBDOMAINS   = True
-SECURE_HSTS_PRELOAD              = True
+# HSTS — only enable after SSL is confirmed working.
+# Setting this without SSL locks browsers out for SECURE_HSTS_SECONDS seconds.
+SECURE_HSTS_SECONDS              = config('SECURE_HSTS_SECONDS', default=0, cast=int)
+SECURE_HSTS_INCLUDE_SUBDOMAINS   = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False, cast=bool)
+SECURE_HSTS_PRELOAD              = config('SECURE_HSTS_PRELOAD', default=False, cast=bool)
+
+# These are safe to enable now — no SSL required
 SECURE_CONTENT_TYPE_NOSNIFF      = True
-SECURE_BROWSER_XSS_FILTER        = True
 X_FRAME_OPTIONS                  = 'DENY'
 
 # ── Database ──────────────────────────────────────────────────────────────────

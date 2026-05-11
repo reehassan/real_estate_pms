@@ -197,30 +197,50 @@ class ExpenseAdmin(ImportExportModelAdmin,  SimpleHistoryAdmin, UnfoldModelAdmin
         return response
 
     # ── Badges ─────────────────────────────────────────────────────
-
     @display(
         description=_("Category"),
         ordering="category",
         label={
-            "Construction":  "primary",    # violet  — major spend
-            "Marketing":     "info",        # sky     — outward-facing
-            "Salaries":      "success",     # emerald — people
-            "Utilities":     "warning",     # amber   — operational
-            "Legal":         "warning",     # amber   — caution
-            "Miscellaneous": "secondary",   # slate   — unclassified
+            # Tier 1 — violet/primary for high-cost items
+            "Construction":          "primary",
+            "Daily Labour":          "primary",
+            "Staff Salaries":        "success",
+            "Transportation & Fuel": "info",
+ 
+            # Tier 2
+            "Government Fees & NOC": "warning",
+            "Agent Commission":      "warning",
+            "Marketing & Advertising": "info",
+            "Utilities":             "warning",
+ 
+            # Tier 3
+            "Equipment Rental":      "info",
+            "Maintenance & Repair":  "secondary",
+            "Office Supplies":       "secondary",
+            "Food":  "success",
+            "Office / Site Rent":    "secondary",
+            "Security":              "secondary",
+            "Legal & Documentation": "warning",
+ 
+            # Tier 4
+            "Insurance":             "secondary",
+            "Taxes & Duties":        "danger",
+            "Miscellaneous":         "secondary",
         },
     )
+    
     def category_badge(self, obj):
         return obj.get_category_display()
+
 
     @display(
         description=_("Payment"),
         ordering="payment_method",
         label={
-            "Cash":          "success",    # emerald — immediate/liquid
-            "Bank Transfer": "primary",    # violet  — formal/digital
-            "Cheque":        "info",       # sky     — documented
-            "Online":        "warning",    # amber   — digital but async
+            "Cash":          "success",
+            "Bank Transfer": "primary",
+            "Cheque":        "info",
+            "Online":        "warning",
         },
     )
     def payment_method_badge(self, obj):

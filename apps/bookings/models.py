@@ -253,7 +253,12 @@ class Installment(models.Model):
                              default=Status.PENDING,
                          )
     notes              = models.TextField(null=True, blank=True)
-
+    receipt            = models.FileField(
+                            upload_to='installments/receipts/%Y/%m/',
+                            null=True,
+                            blank=True,
+                            verbose_name=("Payment Receipt")
+    )
     # ── Soft delete ────────────────────────────────────────────────
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)

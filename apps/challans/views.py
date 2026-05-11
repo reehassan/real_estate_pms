@@ -12,13 +12,13 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
+from weasyprint import HTML
 
 from apps.bookings.models import Installment
 
 
 @login_required
 def challan_pdf(request, installment_id):
-    from weasyprint import HTML
     installment = get_object_or_404(
         Installment.objects
         .select_related(

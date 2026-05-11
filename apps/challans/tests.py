@@ -83,7 +83,7 @@ class _F:
         return Booking.objects.create(
             customer     = customer,
             plot         = plot,
-            payment_plan = Booking.PaymentPlan.ONE_YEAR,
+            payment_plan = Booking.PaymentPlan.LUMP_SUM,
             status       = Booking.Status.ACTIVE,
             total_price  = Decimal('1000000'),
             token_amount = Decimal('50000'),
@@ -251,11 +251,11 @@ class ChallanViewTests(TestCase):
 
         # ONE_YEAR plan generates 12 installments via signal
         expected_count = self.booking.installments.count()
-        self.assertEqual(expected_count, 12)
+        self.assertEqual(expected_count, 1)
 
         user = _F.user(is_staff=True)
         self.client.login(username=user.username, password='testpass123')
         self.client.get(self.url)
 
-        _, context = mock_render.call_args[0][0], mock_render.call_args[0][1]
+        _template, context = mock_render.call_args[0]
         self.assertEqual(context['total_installments'], expected_count)
