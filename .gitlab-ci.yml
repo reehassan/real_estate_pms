@@ -81,15 +81,25 @@ deploy:
     name: production
     url: http://$VPS_HOST:8080/admin
 
+  # before_script:
+  # - apk add --no-cache openssh-client bash curl
+  # - eval $(ssh-agent -s)
+  # - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > /tmp/deploy_key
+  # - chmod 400 /tmp/deploy_key
+  # - ssh-add /tmp/deploy_key
+  # - rm -f /tmp/deploy_key
+  # - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+  # - ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
   before_script:
   - apk add --no-cache openssh-client bash curl
   - eval $(ssh-agent -s)
   - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > /tmp/deploy_key
   - chmod 400 /tmp/deploy_key
+  # debug lines — remove after fixed
+  - head -1 /tmp/deploy_key
+  - tail -1 /tmp/deploy_key
+  - wc -c /tmp/deploy_key
   - ssh-add /tmp/deploy_key
-  - rm -f /tmp/deploy_key
-  - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-  - ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
   script:
     - |
