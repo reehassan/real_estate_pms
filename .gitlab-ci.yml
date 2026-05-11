@@ -79,7 +79,7 @@ deploy:
 
   environment:
     name: production
-    url: http://$VPS_HOST:8080/admin
+    url: http://$VPS_HOST/admin
 
   before_script:
   - apk add --no-cache openssh-client bash curl
@@ -100,7 +100,7 @@ deploy:
         COMPOSE="docker compose -f $APP_DIR/docker/docker-compose.prod.yml"
         APP_CONTAINER="docker-app-1"
         IMAGE="royal-land-pms:prod"
-        HEALTH_URL="http://localhost:8080/admin/login/"
+        HEALTH_URL="http://localhost:80/admin/login/"
 
         # ── 1. Tag current image as :previous (rollback target) ───────────────
         echo "==> [1/5] Saving current image as rollback target..."
