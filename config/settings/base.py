@@ -53,6 +53,11 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = "accounts.User"
 
+
+SESSION_COOKIE_AGE = 15 * 60           # 30 mints
+SESSION_SAVE_EVERY_REQUEST = True        # reset timer on every request
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # logout when browser closes
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
