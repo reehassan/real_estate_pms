@@ -1,14 +1,5 @@
 # =============================================================================
 # .gitlab-ci.yml — Royal Land PMS
-#
-# Stages:
-#   test   → full 256-test suite against PostgreSQL 16
-#   deploy → SSH deploy with health check + auto rollback on failure
-#
-# GitLab CI/CD Variables (Settings → CI/CD → Variables):
-#   SSH_PRIVATE_KEY  — type: FILE, contents of ~/.ssh/id_rsa  (protected)
-#   VPS_HOST         — type: Variable, Oracle VPS IP           (protected)
-#   VPS_USER         — type: Variable, ubuntu                  (protected)
 # =============================================================================
 
 stages:
@@ -49,7 +40,6 @@ test:
     policy: pull-push
 
   before_script:
-    # WeasyPrint system dependencies
     - apt-get update && apt-get install -y --no-install-recommends
         libpango-1.0-0
         libpangoft2-1.0-0
@@ -82,14 +72,14 @@ deploy:
     url: http://$VPS_HOST/admin
 
   before_script:
-  - apk add --no-cache openssh-client bash curl
-  - eval $(ssh-agent -s)
-  - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > /tmp/deploy_key
-  - chmod 400 /tmp/deploy_key
-  - ssh-add /tmp/deploy_key
-  - rm -f /tmp/deploy_key
-  - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-  - ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+    - apk add --no-cache openssh-client bash curl
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > /tmp/deploy_key
+    - chmod 400 /tmp/deploy_key
+    - ssh-add /tmp/deploy_key
+    - rm -f /tmp/deploy_key
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
   script:
     - |
@@ -97,18 +87,18 @@ deploy:
         set -e
 
         APP_DIR="/opt/royal-land"
-        COMPOSE="docker compose -f $APP_DIR/docker/docker-compose.prod.yml"
-        APP_CONTAINER="docker-app-1"
+        COMPOSE_FILE="$APP_DIR/docker/docker-compose.prod.yml"
+        COMPOSE="docker compose -f $COMPOSE_FILE"
         IMAGE="royal-land-pms:prod"
-        HEALTH_URL="http://localhost:80/admin/login/"
+        HEALTH_URL="http://127.0.0.1:80/admin/login/"
 
-        # ── 1. Tag current image as :previous (rollback target) ───────────────
+        # ── 1. Save rollback target ───────────────────────────────────────────
         echo "==> [1/5] Saving current image as rollback target..."
         if docker image inspect "$IMAGE" > /dev/null 2>&1; then
           docker tag "$IMAGE" "royal-land-pms:previous"
           echo "    Saved royal-land-pms:previous"
         else
-          echo "    No existing image found — first deploy, skipping."
+          echo "    No existing image — first deploy, skipping."
         fi
 
         # ── 2. Pull latest code ───────────────────────────────────────────────
@@ -116,56 +106,50 @@ deploy:
         cd "$APP_DIR"
         git pull origin main
 
-        # ── 3. Build and deploy ───────────────────────────────────────────────
+        # ── 3. Build and start ────────────────────────────────────────────────
         echo "==> [3/5] Building and starting containers..."
-        cd "$APP_DIR/docker"
         $COMPOSE up -d --build
 
-        # ── 4. Migrate + collectstatic ────────────────────────────────────────
-        echo "==> [4/5] Running migrate and collectstatic..."
-        sleep 10
-        docker exec "$APP_CONTAINER" python manage.py migrate --noinput
-        docker exec "$APP_CONTAINER" python manage.py collectstatic --noinput --clear
+        # ── 4. Wait for entrypoint to finish (migrate + collectstatic) ────────
+        echo "==> [4/5] Waiting 30s for app startup..."
+        sleep 30
+        $COMPOSE ps
 
-        # ── 5. Health check ───────────────────────────────────────────────────
+        # ── 5. Health check — accepts 200, 301, 302 ───────────────────────────
         echo "==> [5/5] Health check: $HEALTH_URL"
 
-        MAX_RETRIES=5
-        RETRY_DELAY=5
+        MAX_RETRIES=8
+        RETRY_DELAY=10
         ATTEMPT=0
 
-        until curl --silent --fail --max-time 10 "$HEALTH_URL" > /dev/null; do
-          ATTEMPT=$((ATTEMPT + 1))
-          if [ "$ATTEMPT" -ge "$MAX_RETRIES" ]; then
-            echo ""
-            echo "HEALTH CHECK FAILED after $MAX_RETRIES attempts."
-            echo "Rolling back to previous image..."
+        health_pass() {
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$HEALTH_URL" 2>/dev/null || echo "000")
+          echo "$HTTP"
+          echo "$HTTP" | grep -qE "^(200|301|302)$"
+        }
 
+        until health_pass > /dev/null 2>&1; do
+          ATTEMPT=$((ATTEMPT + 1))
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$HEALTH_URL" 2>/dev/null || echo "000")
+          echo "    Attempt $ATTEMPT/$MAX_RETRIES — HTTP $HTTP. Retrying in ${RETRY_DELAY}s..."
+
+          if [ "$ATTEMPT" -ge "$MAX_RETRIES" ]; then
+            echo "HEALTH CHECK FAILED. App logs:"
+            $COMPOSE logs app --tail=25
+            echo "Rolling back..."
             if docker image inspect "royal-land-pms:previous" > /dev/null 2>&1; then
               docker tag "royal-land-pms:previous" "$IMAGE"
               $COMPOSE up -d
-              sleep 10
-              echo "Rollback complete. Previous version is live."
-
-              if curl --silent --fail --max-time 10 "$HEALTH_URL" > /dev/null; then
-                echo "Rollback health check PASSED — old version is running."
-              else
-                echo "Rollback health check also FAILED — manual intervention needed."
-              fi
-            else
-              echo "No previous image found — cannot rollback automatically."
+              sleep 20
+              HTTP_RB=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$HEALTH_URL" 2>/dev/null || echo "000")
+              echo "Post-rollback HTTP: $HTTP_RB"
             fi
-
             exit 1
           fi
-
-          echo "    Attempt $ATTEMPT/$MAX_RETRIES failed. Retrying in ${RETRY_DELAY}s..."
           sleep "$RETRY_DELAY"
         done
 
-        echo ""
         echo "Health check PASSED."
         echo "==> Deploy complete."
-        echo ""
-        docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        $COMPOSE ps
       DEPLOY
