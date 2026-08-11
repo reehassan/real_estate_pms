@@ -1,6 +1,6 @@
-# Dreamland PMS — Real Estate Property Management System
+# Royalland PMS — Real Estate Property Management System
 
-A production-grade Property Management System built for **Dreamland Developers**, a Pakistani real estate client managing multiple housing scheme projects, plot inventories, customer bookings, installment schedules, and project expenses.
+A production-grade Property Management System built for **Royalland Developers**, a Pakistani real estate client managing multiple housing scheme projects, plot inventories, customer bookings, installment schedules, and project expenses.
 
 This system replaced a spreadsheet-based workflow for the client and has been in active use since 2026. The live client deployment runs on a separate, privately-hosted instance — this repository and the demo below are a portfolio-facing replica for evaluation purposes, seeded with sample data rather than real client records.
 
